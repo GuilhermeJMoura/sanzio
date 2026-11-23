@@ -1,8 +1,8 @@
-import { open, readdir, stat } from "node:fs/promises";
+import { open, readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { JsonObject } from "$types/json.ts";
-import type { SessionInfo, SessionState } from "$types/session.ts";
+import type { SessionInfo, SessionState, WatchSessionOptions } from "$types/session.ts";
 
 // The transcript format is undocumented and changes between Claude Code releases:
 // read only the few fields we need and skip anything that does not look as expected.
@@ -20,9 +20,10 @@ export function projectSlug(cwd: string): string {
 	return cwd.replace(/[^A-Za-z0-9]/g, "-");
 }
 
+const configDirOf = (env: Record<string, string | undefined>) => env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+
 export function projectDir(cwd: string, env: Record<string, string | undefined> = process.env): string {
-	const configDir = env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
-	return join(configDir, "projects", projectSlug(cwd));
+	return join(configDirOf(env), "projects", projectSlug(cwd));
 }
 
 export function formatModel(id: string): string {
@@ -100,7 +101,22 @@ async function readTail(file: string): Promise<string> {
 	}
 }
 
-async function newestTranscript(dir: string, since: number): Promise<{ file: string; mtime: number } | null> {
+/** The transcript of the claude process `pid`, from `<config>/sessions/<pid>.json`; null when that file is missing. */
+async function sessionTranscript(configDir: string, pid: number): Promise<string | null> {
+	let data: unknown;
+	try {
+		data = JSON.parse(await readFile(join(configDir, "sessions", `${pid}.json`), "utf8"));
+	} catch {
+		return null;
+	}
+	if (!isObject(data)) return null;
+	const sessionId = asString(data.sessionId);
+	const cwd = asString(data.cwd);
+	if (!sessionId || !cwd || !/^[\w-]+$/.test(sessionId)) return null;
+	return join(configDir, "projects", projectSlug(cwd), `${sessionId}.jsonl`);
+}
+
+async function newestTranscript(dir: string, since: number): Promise<string | null> {
 	let names: string[];
 	try {
 		names = await readdir(dir);
@@ -117,24 +133,29 @@ async function newestTranscript(dir: string, since: number): Promise<{ file: str
 		);
 		if (mtime >= since && (!newest || mtime > newest.mtime)) newest = { file, mtime };
 	}
-	return newest;
+	return newest?.file ?? null;
 }
 
-/** Polls the newest transcript of `cwd` touched since `since` and reports changes; returns a stop function. */
-export function watchSession(cwd: string, since: number, onChange: (info: SessionInfo) => void): () => void {
-	const dir = projectDir(cwd);
+/** Polls the transcript of claude process `pid` and reports changes; returns a stop function. */
+export function watchSession(
+	{ cwd, pid, since, env = process.env }: WatchSessionOptions,
+	onChange: (info: SessionInfo) => void,
+): () => void {
+	const configDir = configDirOf(env);
 	let lastKey = "";
 	let busy = false;
 	const tick = async () => {
 		if (busy) return;
 		busy = true;
 		try {
-			const newest = await newestTranscript(dir, since);
-			if (!newest) return;
-			const key = `${newest.file}:${newest.mtime}`;
+			// fall back to the newest transcript only while claude has not written its pid file
+			const file = (await sessionTranscript(configDir, pid)) ?? (await newestTranscript(projectDir(cwd, env), since));
+			if (!file) return;
+			const { mtimeMs, size } = await stat(file);
+			const key = `${file}:${mtimeMs}:${size}`;
 			if (key === lastKey) return;
 			lastKey = key;
-			onChange(parseTranscript(await readTail(newest.file)));
+			onChange(parseTranscript(await readTail(file)));
 		} catch {
 			// a transcript we cannot read leaves the title as it was
 		} finally {

@@ -95,7 +95,7 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 		if (proc.exitCode === null && proc.signalCode === null) proc.kill();
 	});
 
-	const stopWatching = watchSession(launch.cwd, startedAt, (info) => {
+	const stopWatching = watchSession({ cwd: launch.cwd, pid: proc.pid, since: startedAt, env: launch.env }, (info) => {
 		box.title = formatTitle(info);
 	});
 
