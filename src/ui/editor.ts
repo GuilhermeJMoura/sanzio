@@ -121,7 +121,7 @@ export function createEditor(
 		if (hit) handlers.onTab(hit[2]);
 	};
 
-	let shown = { path: null as string | null, content: "", firstJust: -1 };
+	let shown = { path: null as string | null, content: "", justLines: [] as number[] };
 	return {
 		box,
 		update(model: EditorModel) {
@@ -153,13 +153,15 @@ export function createEditor(
 			if (!changed) return;
 			code.filetype = pathToFiletype(model.path) ?? "text";
 			code.content = view.content;
-			// jump to what claude just wrote; keep the place when only the age or the gutter changed
-			if (view.firstJust >= 0 && view.firstJust !== shown.firstJust) {
+			// each new edit (a new justLines list) jumps to what claude just wrote, even at the same row as the last one;
+			// the user's scroll stays when only the age or the gutter changed
+			const newEdit = model.justLines.length > 0 && model.justLines !== shown.justLines;
+			if (view.firstJust >= 0 && newEdit) {
 				code.scrollY = Math.max(0, view.firstJust - JUST_TOP_MARGIN);
 			} else if (shown.path !== model.path) {
 				code.scrollY = 0;
 			}
-			shown = { path: model.path, content: view.content, firstJust: view.firstJust };
+			shown = { path: model.path, content: view.content, justLines: model.justLines };
 		},
 		scroll(lines: number) {
 			code.scrollY = Math.max(0, Math.min(code.maxScrollY, code.scrollY + lines));

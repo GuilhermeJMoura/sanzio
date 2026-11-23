@@ -39,3 +39,35 @@ describe("the editor shows the raw source, never concealed markup", () => {
 		expect(frame).toContain("+ ## QA repo");
 	});
 });
+
+describe("following an edit scrolls to the latest edit's first changed line", () => {
+	test("claude editing line 250 again brings it back on screen after the user scrolled up to older hunks", async () => {
+		const before = Array.from({ length: 300 }, (_, i) => `const line${i + 1} = ${i + 1};`);
+		const older = [...before];
+		for (const n of [5, 50, 100, 150, 200]) older[n - 1] = `const line${n} = 'older';`;
+		const first = [...older];
+		first[249] = "const line250 = 'first try';";
+		const second = [...older];
+		second[249] = "const line250 = 'second try';";
+
+		setup = await createTestRenderer({ width: 80, height: 20 });
+		const editor = createEditor(setup.renderer, { onFocus: noop, onOpenPending: noop, onDismiss: noop, onTab: noop });
+		setup.renderer.root.add(editor.box);
+		const settle = async () => {
+			for (let i = 0; i < 10; i++) {
+				await setup?.renderOnce();
+				await Bun.sleep(25);
+			}
+		};
+		editor.update(model("src/big.ts", before, first, [250]));
+		await settle();
+		expect(setup.captureCharFrame()).toContain("'first try';  ◂ claude");
+		editor.scroll(-1000);
+		await settle();
+		expect(setup.captureCharFrame()).not.toContain("line250");
+
+		editor.update(model("src/big.ts", before, second, [250]));
+		await settle();
+		expect(setup.captureCharFrame()).toMatch(/250 \+ const line250 = 'second try';\s+◂ claude/);
+	});
+});
