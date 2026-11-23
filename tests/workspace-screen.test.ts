@@ -111,10 +111,10 @@ describe("AC5 paused, an edit raises 'o claude editou X' with abrir / ignorar", 
 });
 
 describe("AC6 ctrl+e hides and shows explorer and editor; the manual choice beats the automatic one", () => {
-	test("hidden by ctrl+e, a new edit keeps it hidden; the status line hint brings it back", async () => {
+	test("ctrl+e works with claude focused, never reaches claude, and a manual hide survives new edits", async () => {
 		run = await workspace();
 		const r = run;
-		await click(r, "claude editou", 0, EXPLORER);
+		const typed = r.inputs().length;
 		r.write("\x05");
 		await r.waitForScreen((s) => !s.includes("╭─ explorer") && s.includes("editor escondido"), "hidden");
 
@@ -122,8 +122,9 @@ describe("AC6 ctrl+e hides and shows explorer and editor; the manual choice beat
 		await Bun.sleep(300);
 		expect(await r.screen()).not.toContain("╭─ explorer");
 
-		await click(r, "ctrl+e", 0, COLS);
+		r.write("\x05");
 		await r.waitForScreen((s) => s.includes("╭─ explorer"), "shown again");
+		expect(r.inputs().length).toBe(typed);
 	});
 });
 

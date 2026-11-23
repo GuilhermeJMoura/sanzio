@@ -160,7 +160,6 @@ export function createWorkspace(
 	};
 
 	const onKey = (pane: PaneId, key: KeyEvent) => {
-		if (key.ctrl && key.name === "e") return set(toggleWorkspace(state));
 		if (key.name === "f" && !key.ctrl && !key.meta) return set(toggleFollow(state, lastEditPath()));
 		if (pane === "explorer") {
 			if (key.name === "up" || key.name === "down") {
@@ -199,6 +198,14 @@ export function createWorkspace(
 
 	const timer = setInterval(render, TICK_MS);
 	renderer.on("resize", render);
+	// ctrl+e is phdterm's in every pane, claude's included (End still moves to the end of the line there);
+	// global key listeners run before the focused pane, so claude never sees it
+	const onGlobalKey = (key: KeyEvent) => {
+		if (!key.ctrl || key.meta || key.name !== "e") return;
+		key.preventDefault();
+		set(toggleWorkspace(state));
+	};
+	renderer.keyInput.on("keypress", onGlobalKey);
 	render();
 
 	return {
@@ -240,6 +247,7 @@ export function createWorkspace(
 		},
 		stop() {
 			clearInterval(timer);
+			renderer.keyInput.off("keypress", onGlobalKey);
 			stopWatch();
 		},
 	};
