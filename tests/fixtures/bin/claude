@@ -1,0 +1,40 @@
+#!/usr/bin/env bun
+// Stand-in for Claude Code used by the PTY tests: records what it receives and behaves like claude on exit.
+import { appendFileSync, writeSync } from "node:fs";
+
+const logFile = process.env.FAKE_CLAUDE_LOG ?? "/dev/null";
+const record = (entry) => appendFileSync(logFile, `${JSON.stringify(entry)}\n`);
+const pick = (prefixes) =>
+	Object.fromEntries(Object.entries(process.env).filter(([k]) => prefixes.some((p) => k === p || k.startsWith(p))));
+
+record({
+	event: "start",
+	argv: process.argv.slice(2),
+	cwd: process.cwd(),
+	env: pick(["MAESTRI_", "PATH", "TERM", "COLORTERM"]),
+	cols: process.stdout.columns,
+	rows: process.stdout.rows,
+});
+
+const kitty = process.env.FAKE_CLAUDE_KEYBOARD !== "legacy";
+process.stdin.setRawMode(true);
+process.stdout.write(`\x1b[?1049h${kitty ? "\x1b[>1u" : "\x1b[>4;2m"}\x1b[?2004h\x1b[?1000h\x1b[?1006h`);
+process.stdout.write("fake claude ready\r\n");
+process.stdout.write("\x1b[38;2;80;250;123mContext 42%\x1b[0m\r\n");
+
+process.stdout.on("resize", () => record({ event: "resize", cols: process.stdout.columns, rows: process.stdout.rows }));
+
+let typed = "";
+process.stdin.on("data", (chunk) => {
+	const bytes = Buffer.from(chunk);
+	record({ event: "input", hex: bytes.toString("hex") });
+	typed += bytes.toString("latin1");
+	if (typed.includes("/exit")) quit();
+});
+
+function quit() {
+	writeSync(1, `${kitty ? "\x1b[<u" : "\x1b[>4m"}\x1b[?2004l\x1b[?1000l\x1b[?1006l\x1b[?1049l`);
+	const id = process.env.FAKE_CLAUDE_SESSION ?? "00000000-0000-0000-0000-000000000000";
+	writeSync(1, `\x1b[2m\nResume this session with:\nclaude --resume ${id}\n\x1b[22m`);
+	process.exit(Number(process.env.FAKE_CLAUDE_EXIT ?? "0"));
+}
