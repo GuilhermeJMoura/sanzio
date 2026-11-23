@@ -1,13 +1,12 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { KeyEvent } from "@opentui/core";
-import type { ConflictAction, DocFormat, EditModel, PromptAction, PromptReason } from "$types/edit.ts";
+import type { ConflictAction, DocFormat, EditModel, EditSurface, PromptAction, PromptReason } from "$types/edit.ts";
 import type { DiffRow } from "$types/observe.ts";
 import { contextRows, diffLines, splitLines } from "./observe/diff.ts";
 import type { SessionChanges } from "./observe/session-changes.ts";
-import { readText } from "./observe/watcher.ts";
+import { readEditable } from "./observe/watcher.ts";
 import { EditHistory, parseDoc, serializeDoc } from "./ui/edit-buffer.ts";
-import type { createEditSurface } from "./ui/editor-textarea.ts";
 
 const PAGE_LINES = 10;
 
@@ -17,7 +16,7 @@ const PAGE_LINES = 10;
  */
 export function createEditController(deps: {
 	root: string;
-	surface: ReturnType<typeof createEditSurface>;
+	surface: EditSurface;
 	changes: SessionChanges;
 	now: () => number;
 	render: () => void;
@@ -114,7 +113,7 @@ export function createEditController(deps: {
 		if (session?.path === path) return;
 		// another file is being edited: its unsaved text is settled first
 		if (session) return guard(() => void enter(path, line), "switch");
-		const raw = await readText(join(deps.root, path));
+		const raw = await readEditable(join(deps.root, path));
 		if (raw === null) {
 			readOnly = path;
 			return deps.render();

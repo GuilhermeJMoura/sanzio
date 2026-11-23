@@ -18,6 +18,16 @@ export interface EditSnapshot {
 	cursor: number;
 }
 
+/** What edit mode needs from the text surface on screen. */
+export interface EditSurface {
+	/** loads `text` with the cursor at the start of the 1-based `line` */
+	load(text: string, line: number): void;
+	set(snapshot: EditSnapshot): void;
+	snapshot(): EditSnapshot;
+	/** moves the cursor `lines` rows down (negative: up) */
+	page(lines: number): void;
+}
+
 /** Why phdterm asks salvar / descartar / cancelar before it drops unsaved text. */
 export type PromptReason = "switch" | "follow" | "leave" | "exit";
 

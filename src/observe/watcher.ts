@@ -84,6 +84,22 @@ export async function readText(path: string): Promise<string | null> {
 	}
 }
 
+/**
+ * A file's text only when saving it back is lossless: strict UTF-8, no NUL, at most 1 MB; null otherwise.
+ * readText's lenient decode would turn invalid bytes into U+FFFD and a save would write those.
+ */
+export async function readEditable(path: string): Promise<string | null> {
+	try {
+		const info = await stat(path);
+		if (!info.isFile() || info.size > MAX_FILE_BYTES) return null;
+		const buffer = await readFile(path);
+		if (buffer.includes(0)) return null;
+		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer);
+	} catch {
+		return null;
+	}
+}
+
 /** Session-start content of each file: the base every diff in this session is computed against. */
 export async function readSnapshot(root: string, files: string[]): Promise<Map<string, string | null>> {
 	const entries = await Promise.all(files.map(async (f) => [f, await readText(join(root, f))] as const));
