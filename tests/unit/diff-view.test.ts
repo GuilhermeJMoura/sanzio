@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { contextRows, diffLines } from "../../src/observe/diff.ts";
-import { diffView } from "../../src/ui/diff-view.ts";
+import { diffView, nextViewerMode, splitView } from "../../src/ui/diff-view.ts";
 
 describe("AC2 the viewer: +/− lines colored, ◂ claude on the last edit", () => {
 	const before = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
@@ -45,5 +45,38 @@ describe("AC2 the viewer: +/− lines colored, ◂ claude on the last edit", () 
 		const v = diffView(rows, []);
 		expect(v.content).not.toContain("◂ claude");
 		expect(v.firstJust).toBe(-1);
+	});
+});
+
+describe("AC7 the viewer modes: diff, arquivo marcado, lado a lado", () => {
+	const ops = diffLines(["a", "b", "c"], ["a", "B", "c", "d"]);
+
+	test("v cycles diff → arquivo → lado a lado → diff", () => {
+		expect(nextViewerMode("diff")).toBe("marked");
+		expect(nextViewerMode("marked")).toBe("split");
+		expect(nextViewerMode("split")).toBe("diff");
+	});
+
+	test("arquivo marcado is every line, with the changed ones marked + / −", () => {
+		const v = diffView(ops, [2, 4]);
+		expect(v.content.split("\n")).toEqual(["a", "b", "B  ◂ claude", "c", "d  ◂ claude"]);
+		expect(v.signs.get(1)?.after).toBe(" −");
+		expect(v.signs.get(2)?.after).toBe(" +");
+		expect(v.targets).toEqual([1, 2, 2, 3, 4]);
+	});
+
+	test("lado a lado: old left, new right, a blank where one side has no line", () => {
+		const v = splitView(ops, []);
+		expect(v.left.content.split("\n")).toEqual(["a", "b", "c", ""]);
+		expect(v.right.content.split("\n")).toEqual(["a", "B", "c", "d"]);
+		expect([...v.left.lineNumbers]).toEqual([
+			[0, 1],
+			[1, 2],
+			[2, 3],
+		]);
+		expect([...v.left.hideLineNumbers]).toEqual([3]);
+		expect(v.left.signs.get(1)?.after).toBe(" −");
+		expect(v.right.signs.get(1)?.after).toBe(" +");
+		expect(v.right.signs.get(3)?.after).toBe(" +");
 	});
 });

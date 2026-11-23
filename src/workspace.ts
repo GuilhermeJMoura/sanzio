@@ -4,10 +4,12 @@ import type { BoxRenderable, CliRenderer, EmbeddedTerminalRenderable, KeyEvent }
 import type { GitMark, HookEvent, RepoInfo } from "$types/observe.ts";
 import type { SessionState } from "$types/session.ts";
 import type { ExplorerItem, PaneId, WorkspaceState, WorkspaceViewModel } from "$types/workspace.ts";
+import { createEditController } from "./edit-controller.ts";
 import { addedLines } from "./observe/diff.ts";
 import { SessionChanges } from "./observe/session-changes.ts";
 import { ToolCalls } from "./observe/tool-calls.ts";
 import { gitBranch, gitMarks, listFiles, readSnapshot, readText, watchTree } from "./observe/watcher.ts";
+import { nextViewerMode } from "./ui/diff-view.ts";
 import { explorerItems } from "./ui/explorer.ts";
 import { ancestors, changedRows, treeRows } from "./ui/explorer-rows.ts";
 import {
@@ -17,6 +19,7 @@ import {
 	initialWorkspace,
 	openByUser,
 	paneSizes,
+	startEditing,
 	toggleFollow,
 	toggleWorkspace,
 	workspaceVisible,
@@ -72,6 +75,7 @@ export function createWorkspace(
 		const explorer = {
 			rootName: basename(repo.root),
 			changed: changedRows(edits, now()),
+			mine: changedRows(changes.yourEdits(), now()),
 			tree: treeRows({
 				files,
 				expanded,
@@ -86,6 +90,7 @@ export function createWorkspace(
 		items = explorerItems(explorer);
 		const last = changes.lastEdit;
 		const totals = changes.totals();
+		const edit = editing.model(state.open);
 		return {
 			visible: workspaceVisible(state),
 			sizes: paneSizes(renderer.width, renderer.height),
@@ -94,7 +99,10 @@ export function createWorkspace(
 			editor: {
 				path: state.open,
 				rows: state.open ? changes.viewerRows(state.open) : [],
+				ops: state.open ? changes.viewerOps(state.open) : [],
 				justLines: last && last.path === state.open ? last.justLines : [],
+				viewer: state.viewer,
+				edit,
 				follow: state.follow,
 				tabs: state.tabs,
 				claudeTouched: edits.map((e) => e.path),
@@ -111,6 +119,8 @@ export function createWorkspace(
 				files: totals.files,
 				workspaceVisible: workspaceVisible(state),
 				manual: state.manual,
+				editing: edit.active,
+				dirty: edit.dirty,
 			},
 		};
 	};
@@ -136,6 +146,7 @@ export function createWorkspace(
 
 	const applyFile = async (path: string, byClaude: boolean, tool: string, justLines?: number[]) => {
 		const content = await readText(join(repo.root, path));
+		editing.external(path, content);
 		if (!changes.apply({ path, content, byClaude, tool, justLines, at: now() })) return;
 		if (content === null) files = files.filter((f) => f !== path);
 		else if (!files.includes(path)) files = [...files, path];
@@ -146,7 +157,18 @@ export function createWorkspace(
 
 	const openPath = async (path: string) => {
 		await ensureBase(path);
-		set(openByUser(state, path, lastEditPath()));
+		// leaving the file I edit with unsaved text asks first
+		const open = () => set(openByUser(state, path, lastEditPath()));
+		if (path === state.open) open();
+		else editing.guard(open);
+	};
+
+	const onToggleFollow = () => {
+		const last = lastEditPath();
+		const switches = state.follow === "paused" && last !== null && last !== state.open;
+		const toggle = () => set(toggleFollow(state, lastEditPath()));
+		if (switches) editing.guard(toggle);
+		else toggle();
 	};
 
 	const activate = (index: number) => {
@@ -160,7 +182,8 @@ export function createWorkspace(
 	};
 
 	const onKey = (pane: PaneId, key: KeyEvent) => {
-		if (key.name === "f" && !key.ctrl && !key.meta) return set(toggleFollow(state, lastEditPath()));
+		const plain = !key.ctrl && !key.meta;
+		if (key.name === "f" && plain) return onToggleFollow();
 		if (pane === "explorer") {
 			if (key.name === "up" || key.name === "down") {
 				cursor = Math.max(0, Math.min(items.length - 1, cursor + (key.name === "up" ? -1 : 1)));
@@ -171,6 +194,8 @@ export function createWorkspace(
 		} else if (pane === "editor") {
 			const step = { up: -1, down: 1, pageup: -10, pagedown: 10 }[key.name];
 			if (step) view.scrollEditor(step);
+			else if (key.name === "i" && plain && state.open) void editing.enter(state.open, view.editorTopLine());
+			else if (key.name === "v" && plain && state.open) set({ ...state, viewer: nextViewerMode(state.viewer) });
 		}
 	};
 
@@ -186,7 +211,24 @@ export function createWorkspace(
 		onTab: (path) => void openPath(path),
 		onKey,
 		onToggleWorkspace: () => set(toggleWorkspace(state)),
-		onToggleFollow: () => set(toggleFollow(state, lastEditPath())),
+		onToggleFollow,
+		onEditAt: (line) => {
+			if (state.open) void editing.enter(state.open, line);
+		},
+		onEditKey: (key) => editing.key(key),
+		onEditChange: () => editing.changed(),
+		onConflict: (action) => editing.conflict(action),
+		onPrompt: (action) => editing.prompt(action),
+	});
+	const editing = createEditController({
+		root: repo.root,
+		surface: view.editSurface,
+		changes,
+		now,
+		render,
+		onStart: () => {
+			state = startEditing(state);
+		},
 	});
 
 	const filesChanged = async (paths: string[], forceClaude = false) => {
@@ -246,6 +288,8 @@ export function createWorkspace(
 			if (next === "idle") calls.clear();
 			render();
 		},
+		/** Claude exited: resolves once the editor holds no unsaved text (asks salvar / descartar / cancelar). */
+		confirmExit: () => editing.confirmExit(),
 		stop() {
 			clearInterval(timer);
 			renderer.keyInput.off("keypress", onGlobalKey);

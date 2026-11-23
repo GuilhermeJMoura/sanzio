@@ -12,6 +12,8 @@ const base: StatusModel = {
 	files: 4,
 	workspaceVisible: true,
 	manual: null,
+	editing: false,
+	dirty: false,
 };
 const text = (model: StatusModel) => {
 	const { left, right } = statusParts(model);
@@ -44,5 +46,13 @@ describe("AC8 status line", () => {
 			"modo conversa · editor abre na 1ª edição · ctrl+e editor · f seguir",
 		);
 		expect(text({ ...base, workspaceVisible: false, manual: false })).toContain("editor escondido · ctrl+e");
+	});
+});
+
+describe("AC1 editing: EDITANDO on the status line, with its keys", () => {
+	test("EDITANDO before the follow mode, ● when unsaved, ctrl+s and esc hints", () => {
+		expect(text({ ...base, follow: "paused", editing: true })).toStartWith(" EDITANDO  PAUSADO ");
+		expect(text({ ...base, follow: "paused", editing: true, dirty: true })).toStartWith(" EDITANDO ●  PAUSADO ");
+		expect(text({ ...base, editing: true })).toContain("| ctrl+s salvar · esc sair · +12");
 	});
 });

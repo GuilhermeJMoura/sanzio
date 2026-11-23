@@ -116,6 +116,7 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 
 	await proc.exited;
 	await Promise.race([eof, Bun.sleep(EOF_GRACE_MS)]);
+	await workspace.confirmExit();
 	stopWatching();
 	workspace.stop();
 	hooks.stop();

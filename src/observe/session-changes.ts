@@ -1,4 +1,4 @@
-import type { ClaudeEdit, DiffRow, DiffStats, FileUpdate, LastEdit } from "$types/observe.ts";
+import type { ClaudeEdit, DiffOp, DiffRow, DiffStats, FileUpdate, LastEdit } from "$types/observe.ts";
 import { contextRows, diffLines, diffStats, splitLines } from "./diff.ts";
 
 export function formatAge(ms: number): string {
@@ -14,6 +14,7 @@ export class SessionChanges {
 	private readonly base = new Map<string, string | null>();
 	private readonly current = new Map<string, string | null>();
 	private readonly claude = new Map<string, ClaudeEdit>();
+	private readonly yours = new Map<string, ClaudeEdit>();
 	lastEdit: LastEdit | null = null;
 
 	hasBase(path: string): boolean {
@@ -36,10 +37,19 @@ export class SessionChanges {
 		this.setBase(update.path, previous);
 		this.current.set(update.path, update.content);
 		const known = this.claude.get(update.path);
-		if (!update.byClaude) {
-			if (known) known.stats = this.statsOf(update.path);
-			return true;
+		if (known && !update.byClaude) known.stats = this.statsOf(update.path);
+		const mine = this.yours.get(update.path);
+		if (mine) mine.stats = this.statsOf(update.path);
+		if (update.byYou) {
+			this.yours.set(update.path, {
+				path: update.path,
+				tool: "phdterm",
+				at: update.at,
+				isNew: this.base.get(update.path) === null,
+				stats: this.statsOf(update.path),
+			});
 		}
+		if (!update.byClaude) return true;
 
 		const justLines =
 			update.justLines ??
@@ -71,6 +81,16 @@ export class SessionChanges {
 		return [...this.claude.values()].sort((a, b) => b.at - a.at);
 	}
 
+	/** Files the user saved from the editor this session, the most recent first. */
+	yourEdits(): ClaudeEdit[] {
+		return [...this.yours.values()].sort((a, b) => b.at - a.at);
+	}
+
+	/** Every line of `path` against its session-start content. */
+	viewerOps(path: string): DiffOp[] {
+		return diffLines(splitLines(this.base.get(path) ?? null), splitLines(this.contentOf(path)));
+	}
+
 	isClaudeEdited(path: string): boolean {
 		return this.claude.has(path);
 	}
@@ -86,6 +106,6 @@ export class SessionChanges {
 	}
 
 	viewerRows(path: string): DiffRow[] {
-		return contextRows(diffLines(splitLines(this.base.get(path) ?? null), splitLines(this.contentOf(path))));
+		return contextRows(this.viewerOps(path));
 	}
 }

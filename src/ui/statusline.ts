@@ -5,11 +5,13 @@ import { DRACULA, styled } from "./theme.ts";
 const d = DRACULA;
 
 export function statusParts(m: StatusModel): StatusParts {
-	const left: Segment[] = [
+	const left: Segment[] = [];
+	if (m.editing) left.push({ text: m.dirty ? " EDITANDO ● " : " EDITANDO ", fg: d.bg, bg: d.mod, bold: true });
+	left.push(
 		m.follow === "following"
 			? { text: " SEGUINDO ", fg: d.bg, bg: d.accent, bold: true }
 			: { text: " PAUSADO ", fg: d.fg, bg: d.line2, bold: true },
-	];
+	);
 	if (m.branch) left.push({ text: ` ⎇ ${m.branch} `, fg: d.fg, bg: d.line2 });
 	if (m.busy && m.current) {
 		left.push({ text: " claude em ", fg: d.dim }, { text: `${m.current} `, fg: d.fg });
@@ -22,7 +24,16 @@ export function statusParts(m: StatusModel): StatusParts {
 		: m.manual === false
 			? "editor escondido · "
 			: "modo conversa · editor abre na 1ª edição · ";
+	const editKeys: Segment[] = m.editing
+		? [
+				{ text: "ctrl+s", fg: d.accent },
+				{ text: " salvar · ", fg: d.faint },
+				{ text: "esc", fg: d.accent },
+				{ text: " sair · ", fg: d.faint },
+			]
+		: [];
 	const right: Segment[] = [
+		...editKeys,
 		{ text: `+${m.added}`, fg: d.add },
 		{ text: " ", fg: d.dim },
 		{ text: `−${m.removed}`, fg: d.del },

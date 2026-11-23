@@ -24,7 +24,10 @@ async function show(model: EditorModel) {
 const model = (path: string, before: string[], after: string[], justLines: number[]): EditorModel => ({
 	path,
 	rows: contextRows(diffLines(before, after)),
+	ops: diffLines(before, after),
 	justLines,
+	viewer: "diff",
+	edit: { active: false, dirty: false, conflict: null, prompt: null, readOnly: false },
 	follow: "following",
 	tabs: [path],
 	claudeTouched: [path],

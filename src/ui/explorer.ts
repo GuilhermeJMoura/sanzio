@@ -1,5 +1,5 @@
 import { BoxRenderable, type CliRenderer, TextRenderable } from "@opentui/core";
-import type { ExplorerItem, ExplorerLine, ExplorerModel, Segment } from "$types/workspace.ts";
+import type { ChangedRow, ExplorerItem, ExplorerLine, ExplorerModel, Segment } from "$types/workspace.ts";
 import { DRACULA, fileIcon, styled } from "./theme.ts";
 
 const d = DRACULA;
@@ -7,6 +7,7 @@ const d = DRACULA;
 export function explorerItems(m: ExplorerModel): ExplorerItem[] {
 	return [
 		...m.changed.map((r) => ({ kind: "file" as const, path: r.path })),
+		...m.mine.map((r) => ({ kind: "file" as const, path: r.path })),
 		...m.tree.map((r) => ({ kind: r.kind, path: r.path })),
 	];
 }
@@ -33,7 +34,7 @@ function section(title: string, count: string, cols: number): ExplorerLine {
 	return { item: null, segments: [{ text: ` ${title} ${rule} ${count} `, fg: d.faint }] };
 }
 
-/** The explorer as lines of cells: "claude editou" then the repo tree, each selectable line tied to an item. */
+/** The explorer as lines of cells: "claude editou", "você editou" (when any) then the repo tree, each selectable line tied to an item. */
 export function explorerLines(m: ExplorerModel, cols: number): ExplorerLine[] {
 	const lines: ExplorerLine[] = [section("claude editou", String(m.changed.length), cols)];
 	let item = 0;
@@ -48,7 +49,7 @@ export function explorerLines(m: ExplorerModel, cols: number): ExplorerLine[] {
 	if (m.changed.length === 0) {
 		lines.push({ item: null, segments: [{ text: " o que o claude editar aparece aqui", fg: d.faint }] });
 	}
-	for (const r of m.changed) {
+	const changedRow = (r: ChangedRow) => {
 		const icon = fileIcon(r.path);
 		lines.push(
 			row(
@@ -65,6 +66,11 @@ export function explorerLines(m: ExplorerModel, cols: number): ExplorerLine[] {
 				r.path,
 			),
 		);
+	};
+	m.changed.forEach(changedRow);
+	if (m.mine.length > 0) {
+		lines.push({ item: null, segments: [{ text: "" }] }, section("você editou", String(m.mine.length), cols));
+		m.mine.forEach(changedRow);
 	}
 	lines.push({ item: null, segments: [{ text: "" }] }, section(m.rootName, "", cols));
 	for (const r of m.tree) {

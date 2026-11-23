@@ -3,7 +3,16 @@ import type { PaneId, PaneSizes, WorkspaceState } from "$types/workspace.ts";
 const MAX_TABS = 4;
 
 export function initialWorkspace(): WorkspaceState {
-	return { focus: "claude", follow: "following", manual: null, hasEdits: false, open: null, tabs: [], pending: null };
+	return {
+		focus: "claude",
+		follow: "following",
+		manual: null,
+		hasEdits: false,
+		open: null,
+		tabs: [],
+		pending: null,
+		viewer: "diff",
+	};
 }
 
 /** Explorer and editor show after claude's first edit, unless ctrl+e said otherwise. */
@@ -54,4 +63,9 @@ export function toggleWorkspace(s: WorkspaceState): WorkspaceState {
 export function focusPane(s: WorkspaceState, pane: PaneId): WorkspaceState {
 	if (pane !== "claude" && !workspaceVisible(s)) return s;
 	return { ...s, focus: pane };
+}
+
+/** Edit mode started (or needs an answer): follow pauses and the editor shows with the focus. */
+export function startEditing(s: WorkspaceState): WorkspaceState {
+	return { ...s, follow: "paused", focus: "editor", manual: workspaceVisible(s) ? s.manual : true };
 }

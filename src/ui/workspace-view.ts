@@ -29,6 +29,11 @@ export function createWorkspaceView(
 		onOpenPending: handlers.onOpenPending,
 		onDismiss: handlers.onDismiss,
 		onTab: handlers.onTab,
+		onEditAt: handlers.onEditAt,
+		onEditKey: handlers.onEditKey,
+		onEditChange: handlers.onEditChange,
+		onConflict: handlers.onConflict,
+		onPrompt: handlers.onPrompt,
 	});
 	const status = createStatusLine(renderer, {
 		onToggleWorkspace: handlers.onToggleWorkspace,
@@ -53,6 +58,8 @@ export function createWorkspaceView(
 	return {
 		root,
 		scrollEditor: editor.scroll,
+		editorTopLine: editor.topLine,
+		editSurface: editor.surface,
 		render(vm: WorkspaceViewModel) {
 			explorer.box.visible = vm.visible;
 			editor.box.visible = vm.visible;
@@ -67,7 +74,8 @@ export function createWorkspaceView(
 			}
 			status.update(vm.status);
 
-			const target = vm.focus === "explorer" ? explorer.box : vm.focus === "editor" ? editor.box : claude.terminal;
+			const editorTarget = vm.editor.edit.active ? editor.surface.area : editor.box;
+			const target = vm.focus === "explorer" ? explorer.box : vm.focus === "editor" ? editorTarget : claude.terminal;
 			if (!target.focused) target.focus();
 		},
 	};

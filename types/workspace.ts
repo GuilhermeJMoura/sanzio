@@ -1,5 +1,6 @@
 import type { KeyEvent } from "@opentui/core";
-import type { DiffRow } from "./observe.ts";
+import type { ConflictAction, EditModel, PromptAction, ViewerMode } from "./edit.ts";
+import type { DiffOp, DiffRow } from "./observe.ts";
 
 export type PaneId = "explorer" | "editor" | "claude";
 
@@ -15,6 +16,8 @@ export interface WorkspaceState {
 	tabs: string[];
 	/** file claude edited while follow was paused, offered in the "o claude editou X" notice */
 	pending: string | null;
+	/** viewer layout, kept for the next files */
+	viewer: ViewerMode;
 }
 
 export interface PaneSizes {
@@ -33,6 +36,8 @@ export interface StatusModel {
 	files: number;
 	workspaceVisible: boolean;
 	manual: boolean | null;
+	editing: boolean;
+	dirty: boolean;
 }
 
 /** A run of styled text in a terminal cell row. */
@@ -67,6 +72,8 @@ export interface ChangedRow {
 export interface ExplorerModel {
 	rootName: string;
 	changed: ChangedRow[];
+	/** files the user saved from the editor this session */
+	mine: ChangedRow[];
 	tree: TreeRow[];
 	open: string | null;
 	/** keyboard cursor, an index into the explorer items (changed rows, then tree rows) */
@@ -85,7 +92,11 @@ export interface ExplorerLine {
 export interface EditorModel {
 	path: string | null;
 	rows: DiffRow[];
+	/** every line of the file against its session-start content, for the marked and side-by-side layouts */
+	ops: DiffOp[];
 	justLines: number[];
+	viewer: ViewerMode;
+	edit: EditModel;
 	follow: FollowMode;
 	tabs: string[];
 	claudeTouched: string[];
@@ -109,6 +120,14 @@ export interface DiffView {
 	extraHighlights: [number, number, string][];
 	/** row of the first line claude just wrote, or -1 */
 	firstJust: number;
+	/** 1-based line of the current file each row stands for, where a double click starts editing */
+	targets: number[];
+}
+
+export interface SplitView {
+	left: DiffView;
+	right: DiffView;
+	firstJust: number;
 }
 
 export interface WorkspaceViewModel {
@@ -129,4 +148,10 @@ export interface WorkspaceHandlers {
 	onKey: (pane: PaneId, key: KeyEvent) => void;
 	onToggleWorkspace: () => void;
 	onToggleFollow: () => void;
+	/** double click on a viewer line: start editing at that 1-based line */
+	onEditAt: (line: number) => void;
+	onEditKey: (key: KeyEvent) => void;
+	onEditChange: () => void;
+	onConflict: (action: ConflictAction) => void;
+	onPrompt: (action: PromptAction) => void;
 }

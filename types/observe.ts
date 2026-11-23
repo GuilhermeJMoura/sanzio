@@ -70,6 +70,8 @@ export interface FileUpdate {
 	/** new content; null when the file is gone */
 	content: string | null;
 	byClaude: boolean;
+	/** the user saved it from phdterm's editor (ctrl+s) */
+	byYou?: boolean;
 	tool: string;
 	/** new-file lines this edit added, when the hook said so (structuredPatch) */
 	justLines?: number[];

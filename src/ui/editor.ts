@@ -1,16 +1,28 @@
-import type { CliRenderer, SimpleHighlight } from "@opentui/core";
-import { BoxRenderable, CodeRenderable, LineNumberRenderable, pathToFiletype, TextRenderable } from "@opentui/core";
+import type { CliRenderer, KeyEvent } from "@opentui/core";
+import { BoxRenderable, TextRenderable } from "@opentui/core";
+import type { ConflictAction, EditModel, PromptAction } from "$types/edit.ts";
 import type { EditorModel, Segment } from "$types/workspace.ts";
-import { diffView } from "./diff-view.ts";
+import { createBanner } from "./banner.ts";
+import { createEditSurface } from "./editor-textarea.ts";
+import { createViewer } from "./editor-viewer.ts";
 import { createSyntaxStyle, DRACULA, fileIcon, styled } from "./theme.ts";
 
 const d = DRACULA;
-const JUST_TOP_MARGIN = 3;
+const VIEWER_LABELS = { diff: "diff", marked: "arquivo", split: "lado a lado" } as const;
 
 function followLabel(model: EditorModel): Segment[] {
-	return model.follow === "following"
-		? [{ text: " ● seguindo o claude ", fg: d.accent, bg: d.bg }]
-		: [{ text: " ◌ seguir pausado · f ", fg: d.dim, bg: d.bg }];
+	const mode: Segment[] = model.edit.active
+		? []
+		: [
+				{ text: ` v ${VIEWER_LABELS[model.viewer]} `, fg: d.dim, bg: d.bg },
+				{ text: "·", fg: d.faint, bg: d.bg },
+			];
+	return [
+		...mode,
+		model.follow === "following"
+			? { text: " ● seguindo o claude ", fg: d.accent, bg: d.bg }
+			: { text: " ◌ seguir pausado · f ", fg: d.dim, bg: d.bg },
+	];
 }
 
 /** Tab strip segments, and the column range of each tab for clicks. */
@@ -35,9 +47,31 @@ function tabs(model: EditorModel): { segments: Segment[]; ranges: [number, numbe
 	return { segments, ranges };
 }
 
+function title(model: EditorModel): string {
+	if (!model.path) return " editor ";
+	if (model.edit.readOnly) return ` ${model.path} · só leitura `;
+	return model.edit.active && model.edit.dirty ? ` ${model.path} ● ` : ` ${model.path} `;
+}
+
+const PROMPT_TEXT = {
+	switch: "alterações não salvas · trocar de arquivo?",
+	leave: "alterações não salvas · sair da edição?",
+	exit: "o claude saiu · alterações não salvas",
+} as const;
+
 export function createEditor(
 	renderer: CliRenderer,
-	handlers: { onFocus: () => void; onOpenPending: () => void; onDismiss: () => void; onTab: (path: string) => void },
+	handlers: {
+		onFocus: () => void;
+		onOpenPending: () => void;
+		onDismiss: () => void;
+		onTab: (path: string) => void;
+		onEditAt?: (line: number) => void;
+		onEditKey?: (key: KeyEvent) => void;
+		onEditChange?: () => void;
+		onConflict?: (action: ConflictAction) => void;
+		onPrompt?: (action: PromptAction) => void;
+	},
 ) {
 	const box = new BoxRenderable(renderer, {
 		id: "editor",
@@ -53,32 +87,20 @@ export function createEditor(
 	});
 	const follow = new TextRenderable(renderer, { id: "editor-follow", position: "absolute", top: -1, right: 1 });
 	const tabRow = new TextRenderable(renderer, { id: "editor-tabs", width: "100%", height: 1, wrapMode: "none" });
-	const banner = new BoxRenderable(renderer, {
-		id: "editor-banner",
-		width: "100%",
-		height: 1,
-		flexDirection: "row",
-		backgroundColor: d.accentBg,
-		visible: false,
-	});
-	const bannerText = new TextRenderable(renderer, { flexGrow: 1, flexShrink: 1, wrapMode: "none" });
-	const openButton = new TextRenderable(renderer, {
-		content: styled([{ text: " abrir ", fg: d.bg, bg: d.accent, bold: true }]),
-	});
-	const ignoreButton = new TextRenderable(renderer, {
-		content: styled([{ text: " " }, { text: " ignorar ", fg: d.dim, bg: d.line2 }, { text: " " }]),
-	});
-	openButton.onMouseDown = (event) => {
-		event.stopPropagation();
-		handlers.onOpenPending();
-	};
-	ignoreButton.onMouseDown = (event) => {
-		event.stopPropagation();
-		handlers.onDismiss();
-	};
-	banner.add(bannerText);
-	banner.add(openButton);
-	banner.add(ignoreButton);
+	const notice = createBanner(renderer, "editor-banner", [
+		{ label: "abrir", onClick: handlers.onOpenPending },
+		{ label: "ignorar", onClick: handlers.onDismiss },
+	]);
+	const conflict = createBanner(renderer, "editor-conflict", [
+		{ label: "recarregar", onClick: () => handlers.onConflict?.("reload") },
+		{ label: "manter o meu", onClick: () => handlers.onConflict?.("keep") },
+		{ label: "ver diff dele", onClick: () => handlers.onConflict?.("diff") },
+	]);
+	const prompt = createBanner(renderer, "editor-prompt", [
+		{ label: "salvar s", onClick: () => handlers.onPrompt?.("save") },
+		{ label: "descartar d", onClick: () => handlers.onPrompt?.("discard") },
+		{ label: "cancelar esc", onClick: () => handlers.onPrompt?.("cancel") },
+	]);
 
 	const empty = new TextRenderable(renderer, {
 		id: "editor-empty",
@@ -89,31 +111,22 @@ export function createEditor(
 			{ text: "  ou escolha um arquivo no explorer", fg: d.faint },
 		]),
 	});
-	let extra: SimpleHighlight[] = [];
-	const code = new CodeRenderable(renderer, {
-		id: "editor-code",
-		content: "",
-		syntaxStyle: createSyntaxStyle(renderer),
-		width: "100%",
-		height: "100%",
-		wrapMode: "none",
-		// the viewer shows the raw source: highlight colors only, never hidden markup (# of a heading, fences)
-		conceal: false,
-		fg: d.fg,
-		onHighlight: (highlights) => [...highlights, ...extra],
+	const style = createSyntaxStyle(renderer);
+	const viewer = createViewer(renderer, style, (line) => handlers.onEditAt?.(line));
+	const surface = createEditSurface(renderer, style, {
+		onKey: (key) => handlers.onEditKey?.(key),
+		onChange: () => handlers.onEditChange?.(),
 	});
-	const gutter = new LineNumberRenderable(renderer, {
-		id: "editor-diff",
-		target: code,
-		fg: d.faint,
-		width: "100%",
-		flexGrow: 1,
-		visible: false,
-	});
-	gutter.setGutterLayout({ minWidth: 0, paddingLeft: 1, paddingRight: 1, minDigits: 3, minAfterWidth: 2 });
 
-	for (const child of [follow, tabRow, banner, empty, gutter]) box.add(child);
-	box.onMouseDown = () => handlers.onFocus();
+	for (const child of [follow, tabRow, notice.box, conflict.box, prompt.box, empty, viewer.box, surface.gutter]) {
+		box.add(child);
+	}
+	let editing = false;
+	box.onMouseDown = (event) => {
+		// while editing, the click must not move the focus from the edit surface to this box
+		if (editing) event.preventDefault();
+		handlers.onFocus();
+	};
 	let tabRanges: [number, number, string][] = [];
 	tabRow.onMouseDown = (event) => {
 		const col = event.x - tabRow.x;
@@ -121,50 +134,60 @@ export function createEditor(
 		if (hit) handlers.onTab(hit[2]);
 	};
 
-	let shown = { path: null as string | null, content: "", justLines: [] as number[] };
+	const showBanners = (model: EditorModel, edit: EditModel) => {
+		notice.show(model.pending !== null && model.pending !== model.path, [
+			{ text: " ● ", fg: d.accent },
+			{ text: "o claude editou ", fg: d.fg },
+			{ text: model.pending ?? "", fg: d.strong, bold: true },
+			{ text: " " },
+		]);
+		conflict.show(
+			edit.conflict !== null,
+			[
+				{ text: " ● ", fg: d.mod },
+				{ text: "o claude mudou este arquivo ", fg: d.fg },
+			],
+			["recarregar", "manter o meu", edit.conflict?.showingDiff ? "voltar ao meu" : "ver diff dele"],
+		);
+		prompt.show(edit.prompt !== null, [
+			{ text: " ● ", fg: d.mod },
+			{ text: edit.prompt ? PROMPT_TEXT[edit.prompt] : "", fg: d.fg },
+			{ text: " " },
+		]);
+	};
+
 	return {
 		box,
+		surface,
 		update(model: EditorModel) {
-			box.title = ` ${model.path ?? "editor"} `;
+			const edit = model.edit;
+			editing = edit.active;
+			box.title = title(model);
 			box.titleColor = model.focused ? d.accent : d.strong;
+			// the edit surface holds the focus while editing, not the box: paint the border from the model
+			box.borderColor = model.focused ? d.accent : d.line2;
 			follow.content = styled(followLabel(model));
 			const strip = tabs(model);
 			tabRanges = strip.ranges;
 			tabRow.content = styled(strip.segments);
 			tabRow.visible = model.tabs.length > 0;
-			banner.visible = model.pending !== null && model.pending !== model.path;
-			bannerText.content = styled([
-				{ text: " ● ", fg: d.accent },
-				{ text: "o claude editou ", fg: d.fg },
-				{ text: model.pending ?? "", fg: d.strong, bold: true },
-				{ text: " " },
-			]);
+			showBanners(model, edit);
 			empty.visible = model.path === null;
-			gutter.visible = model.path !== null;
+			const showingClaudeDiff = edit.conflict?.showingDiff === true;
+			surface.gutter.visible = model.path !== null && edit.active && !showingClaudeDiff;
+			viewer.box.visible = model.path !== null && (!edit.active || showingClaudeDiff);
 			if (!model.path) return;
-
-			const view = diffView(model.rows, model.justLines);
-			extra = view.extraHighlights;
-			gutter.setLineNumbers(view.lineNumbers);
-			gutter.setHideLineNumbers(view.hideLineNumbers);
-			gutter.setLineSigns(view.signs);
-			gutter.setLineColors(view.colors);
-			const changed = shown.path !== model.path || shown.content !== view.content;
-			if (!changed) return;
-			code.filetype = pathToFiletype(model.path) ?? "text";
-			code.content = view.content;
-			// each new edit (a new justLines list) jumps to what claude just wrote, even at the same row as the last one;
-			// the user's scroll stays when only the age or the gutter changed
-			const newEdit = model.justLines.length > 0 && model.justLines !== shown.justLines;
-			if (view.firstJust >= 0 && newEdit) {
-				code.scrollY = Math.max(0, view.firstJust - JUST_TOP_MARGIN);
-			} else if (shown.path !== model.path) {
-				code.scrollY = 0;
-			}
-			shown = { path: model.path, content: view.content, justLines: model.justLines };
+			if (edit.conflict?.showingDiff) viewer.showRows(model.path, edit.conflict.rows);
+			else if (!edit.active)
+				viewer.update({
+					path: model.path,
+					rows: model.rows,
+					ops: model.ops,
+					justLines: model.justLines,
+					mode: model.viewer,
+				});
 		},
-		scroll(lines: number) {
-			code.scrollY = Math.max(0, Math.min(code.maxScrollY, code.scrollY + lines));
-		},
+		scroll: viewer.scroll,
+		topLine: viewer.topLine,
 	};
 }
