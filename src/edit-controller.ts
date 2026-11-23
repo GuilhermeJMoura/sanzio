@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { KeyEvent } from "@opentui/core";
 import type { ConflictAction, DocFormat, EditModel, EditSurface, PromptAction, PromptReason } from "$types/edit.ts";
@@ -31,12 +31,14 @@ export function createEditController(deps: {
 	let afterPrompt: (() => void) | null = null;
 	let exitWaiter: (() => void) | null = null;
 	let readOnly: string | null = null;
+	let saveError: string | null = null;
 
 	const dirty = () => session !== null && surface.snapshot().text !== session.disk;
 
 	const stop = () => {
 		session = null;
 		conflict = null;
+		saveError = null;
 		prompt = null;
 		afterPrompt = null;
 		deps.render();
@@ -50,18 +52,59 @@ export function createEditController(deps: {
 		history = new EditHistory(surface.snapshot());
 	};
 
-	const save = async () => {
+	const markConflict = (raw: string) => {
 		if (!session) return;
-		const { path, format } = session;
+		const next = parseDoc(raw);
+		const rows = contextRows(diffLines(splitLines(session.disk), splitLines(next.text)));
+		conflict = { raw, text: next.text, showingDiff: false, rows };
+	};
+
+	/** What is on disk now, when it is no longer what this session opened or last saved; null when unchanged. */
+	const changedOnDisk = async (file: string, expected: string): Promise<string | null> => {
+		try {
+			const bytes = await readFile(file);
+			return bytes.equals(Buffer.from(expected)) ? null : bytes.toString("utf8");
+		} catch {
+			// gone: writing recreates it, and a folder that is gone fails the write below
+			return null;
+		}
+	};
+
+	/**
+	 * Writes my text; false when it did not: the file changed on disk since I opened it (the conflict notice shows,
+	 * unless `overwrite`), or the write failed (the error shows). Never throws; my text stays in the editor.
+	 */
+	const save = async (overwrite = false): Promise<boolean> => {
+		if (!session) return false;
+		const current = session;
+		const { path, format } = current;
+		const file = join(deps.root, path);
 		const text = surface.snapshot().text;
 		const raw = serializeDoc(text, format);
-		await writeFile(join(deps.root, path), raw);
-		session.disk = text;
+		if (!overwrite) {
+			const theirs = await changedOnDisk(file, serializeDoc(current.disk, format));
+			if (theirs !== null) {
+				markConflict(theirs);
+				deps.render();
+				return false;
+			}
+		}
+		try {
+			await writeFile(file, raw);
+		} catch (error) {
+			const code = error instanceof Error && "code" in error ? String(error.code) : String(error);
+			saveError = `não foi possível salvar: ${code}`;
+			deps.render();
+			return false;
+		}
+		saveError = null;
+		current.disk = text;
 		conflict = null;
 		deps.changes.apply({ path, content: raw, byClaude: false, byYou: true, tool: "phdterm", at: deps.now() });
 		// claude already left: once nothing is unsaved, phdterm can close
-		if (exitWaiter) return stop();
-		deps.render();
+		if (exitWaiter) stop();
+		else deps.render();
+		return true;
 	};
 
 	const ask = (reason: PromptReason, then: (() => void) | null) => {
@@ -76,7 +119,8 @@ export function createEditController(deps: {
 			afterPrompt = null;
 			return deps.render();
 		}
-		if (action === "save") await save();
+		// a save that did not happen keeps the prompt (and phdterm) open on my text
+		if (action === "save" && !(await save())) return;
 		const then = afterPrompt;
 		stop();
 		then?.();
@@ -88,7 +132,7 @@ export function createEditController(deps: {
 			conflict.showingDiff = !conflict.showingDiff;
 			return deps.render();
 		}
-		if (action === "keep") return save();
+		if (action === "keep") return void (await save(true));
 		const { raw, text } = conflict;
 		conflict = null;
 		session.disk = text;
@@ -142,6 +186,7 @@ export function createEditController(deps: {
 				conflict: active && conflict ? { showingDiff: conflict.showingDiff, rows: conflict.rows } : null,
 				prompt: active ? prompt : null,
 				readOnly: path !== null && readOnly === path,
+				error: active ? saveError : null,
 			};
 		},
 		enter,
@@ -185,8 +230,9 @@ export function createEditController(deps: {
 			history.record(surface.snapshot());
 			deps.render();
 		},
-		conflict: (action: ConflictAction) => void resolveConflict(action),
-		prompt: (action: PromptAction) => void answer(action),
+		save: () => save(),
+		conflict: (action: ConflictAction) => resolveConflict(action),
+		prompt: (action: PromptAction) => answer(action),
 		guard,
 		/** The file changed on disk (claude, or anyone but this editor). */
 		external(path: string, raw: string | null) {
@@ -199,8 +245,7 @@ export function createEditController(deps: {
 				load(next.text, surface.snapshot().cursor);
 				return deps.render();
 			}
-			const rows = contextRows(diffLines(splitLines(session.disk), splitLines(next.text)));
-			conflict = { raw, text: next.text, showingDiff: false, rows };
+			markConflict(raw);
 			deps.render();
 		},
 		/** Claude exited: resolves once no unsaved text is left (saved, discarded, or there was none). */

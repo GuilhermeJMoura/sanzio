@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EditSnapshot, EditSurface } from "$types/edit.ts";
 import { createEditController } from "../../src/edit-controller.ts";
@@ -50,5 +50,55 @@ describe("fix: a file that is not valid UTF-8 opens só leitura, never saved los
 		const { edit } = setup({ "utf8.txt": "café\n" });
 		await edit.enter("utf8.txt", 1);
 		expect(edit.model("utf8.txt")).toMatchObject({ active: true, readOnly: false });
+	});
+});
+
+describe("fix: a failed save keeps my text, shows the error and never exits", () => {
+	test("a read-only file: save resolves false, the error shows, the text stays unsaved", async () => {
+		const { root, surface, edit } = setup({ "notes.txt": "alpha\n" });
+		await edit.enter("notes.txt", 1);
+		surface.type("MINE alpha");
+		chmodSync(join(root, "notes.txt"), 0o444);
+		expect(await edit.save()).toBe(false);
+		expect(edit.model("notes.txt")).toMatchObject({ active: true, dirty: true });
+		expect(edit.model("notes.txt").error).toContain("não foi possível salvar");
+		expect(readFileSync(join(root, "notes.txt"), "utf8")).toBe("alpha\n");
+
+		chmodSync(join(root, "notes.txt"), 0o644);
+		expect(await edit.save()).toBe(true);
+		expect(edit.model("notes.txt")).toMatchObject({ dirty: false, error: null });
+		expect(readFileSync(join(root, "notes.txt"), "utf8")).toBe("MINE alpha\n");
+	});
+
+	test("claude exited: salvar failing keeps phdterm open on the prompt; a save that works lets it close", async () => {
+		const { root, surface, edit } = setup({ "notes.txt": "alpha\n" });
+		await edit.enter("notes.txt", 1);
+		surface.type("MINE alpha");
+		chmodSync(join(root, "notes.txt"), 0o444);
+		let closed = false;
+		const exit = edit.confirmExit().then(() => {
+			closed = true;
+		});
+		await edit.prompt("save");
+		expect(closed).toBe(false);
+		expect(edit.model("notes.txt")).toMatchObject({ active: true, dirty: true, prompt: "exit" });
+
+		chmodSync(join(root, "notes.txt"), 0o644);
+		await edit.prompt("save");
+		await exit;
+		expect(readFileSync(join(root, "notes.txt"), "utf8")).toBe("MINE alpha\n");
+	});
+
+	test("the file changed on disk since I opened it: save goes to the conflict instead of overwriting", async () => {
+		const { root, surface, edit } = setup({ "notes.txt": "alpha\n" });
+		await edit.enter("notes.txt", 1);
+		surface.type("MINE alpha");
+		writeFileSync(join(root, "notes.txt"), "THEIRS\n");
+		expect(await edit.save()).toBe(false);
+		expect(edit.model("notes.txt").conflict).not.toBeNull();
+		expect(readFileSync(join(root, "notes.txt"), "utf8")).toBe("THEIRS\n");
+
+		await edit.conflict("keep");
+		expect(readFileSync(join(root, "notes.txt"), "utf8")).toBe("MINE alpha\n");
 	});
 });

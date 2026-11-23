@@ -103,6 +103,8 @@ export function createEditor(
 		{ label: "cancelar esc", onClick: () => handlers.onPrompt?.("cancel") },
 	]);
 
+	const failure = createBanner(renderer, "editor-error", []);
+
 	const empty = new TextRenderable(renderer, {
 		id: "editor-empty",
 		width: "100%",
@@ -119,7 +121,17 @@ export function createEditor(
 		onChange: () => handlers.onEditChange?.(),
 	});
 
-	for (const child of [follow, tabRow, notice.box, conflict.box, prompt.box, empty, viewer.box, surface.gutter]) {
+	for (const child of [
+		follow,
+		tabRow,
+		notice.box,
+		conflict.box,
+		prompt.box,
+		failure.box,
+		empty,
+		viewer.box,
+		surface.gutter,
+	]) {
 		box.add(child);
 	}
 	let editing = false;
@@ -150,6 +162,11 @@ export function createEditor(
 			],
 			["recarregar", "manter o meu", edit.conflict?.showingDiff ? "voltar ao meu" : "ver diff dele"],
 		);
+		failure.show(edit.error !== null, [
+			{ text: " ✕ ", fg: d.del },
+			{ text: edit.error ?? "", fg: d.fg },
+			{ text: " · o texto continua aqui", fg: d.dim },
+		]);
 		prompt.show(edit.prompt !== null, [
 			{ text: " ● ", fg: d.mod },
 			{ text: edit.prompt ? PROMPT_TEXT[edit.prompt] : "", fg: d.fg },

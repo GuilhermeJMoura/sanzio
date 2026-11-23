@@ -42,6 +42,8 @@ export interface EditModel {
 	/** "o claude mudou este arquivo": set while my unsaved text and claude's write disagree */
 	conflict: { showingDiff: boolean; rows: DiffRow[] } | null;
 	prompt: PromptReason | null;
-	/** the open file cannot be edited (binary or over 1 MB) */
+	/** the open file cannot be edited (binary, not UTF-8 or over 1 MB) */
 	readOnly: boolean;
+	/** why the last save did not write, until a save works */
+	error: string | null;
 }

@@ -27,7 +27,7 @@ const model = (path: string, before: string[], after: string[], justLines: numbe
 	ops: diffLines(before, after),
 	justLines,
 	viewer: "diff",
-	edit: { active: false, dirty: false, conflict: null, prompt: null, readOnly: false },
+	edit: { active: false, dirty: false, conflict: null, prompt: null, readOnly: false, error: null },
 	follow: "following",
 	tabs: [path],
 	claudeTouched: [path],

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { chmodSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PhdtermRun } from "$types/testing.ts";
 import { KEY, NOTES, openNotes, startEditing, type } from "./helpers/edit.ts";
@@ -148,7 +148,12 @@ describe("AC5 claude writes the file I am editing with unsaved changes", () => {
 		expect(diff).not.toContain("MINE");
 		await r.click("voltar ao meu");
 		await r.waitForScreen((x) => line(1, "MINE alpha").test(x), "mine again");
+		// ctrl+s does not overwrite claude's write behind my back: the notice stays until I pick
 		r.write(KEY.ctrlS);
+		await Bun.sleep(300);
+		expect(disk(r)).toBe("alpha\nbeta\ngamma\nDELTA\n");
+		expect(await r.screen()).toContain("o claude mudou este arquivo");
+		await r.click("manter o meu");
 		await r.waitFor(() => disk(r) === `MINE ${NOTES}\n`, "mine saved");
 	});
 });
@@ -294,5 +299,23 @@ describe("fix: follow never moves the editor away from unsaved text", () => {
 		expect(disk(r, "src/a.ts")).toBe("xexport const a = 2;\n");
 		await r.claude({ op: "edit", file: "config.json", old: "3600", new: "60" });
 		await r.waitForScreen((s) => s.includes("╭─ config.json"), "editor follows claude");
+	});
+});
+
+describe("fix: a failed ctrl+s shows the error and phdterm keeps running", () => {
+	test("read-only file: the error banner shows, my text stays, a save after chmod works", async () => {
+		run = await openNotes();
+		const r = run;
+		await startEditing(r);
+		await type(r, "MINE ");
+		chmodSync(join(r.cwd, "notes.txt"), 0o444);
+		r.write(KEY.ctrlS);
+		const s = await r.waitForScreen((x) => x.includes("não foi possível salvar: EACCES"), "error banner");
+		expect(s).toMatch(line(1, "MINE alpha"));
+		expect(s).toContain("EDITANDO ●");
+		chmodSync(join(r.cwd, "notes.txt"), 0o644);
+		r.write(KEY.ctrlS);
+		await r.waitForScreen((x) => !x.includes("não foi possível salvar"), "error gone");
+		expect(disk(r)).toBe(`MINE ${NOTES}\n`);
 	});
 });
