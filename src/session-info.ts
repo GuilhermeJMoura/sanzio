@@ -1,6 +1,7 @@
 import { open, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { JsonObject } from "$types/json.ts";
 import type { SessionInfo, SessionState } from "$types/session.ts";
 
 // The transcript format is undocumented and changes between Claude Code releases:
@@ -9,8 +10,6 @@ import type { SessionInfo, SessionState } from "$types/session.ts";
 const STATE_LABELS: Record<SessionState, string> = { working: "trabalhando", idle: "ocioso" };
 const TAIL_BYTES = 256 * 1024;
 const POLL_MS = 1000;
-
-type JsonObject = Record<string, unknown>;
 
 const isObject = (value: unknown): value is JsonObject =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
