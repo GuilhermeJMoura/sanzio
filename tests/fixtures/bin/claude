@@ -130,6 +130,13 @@ const ops = {
 			writeFileSync(resolve(file), content);
 			return { filePath: resolve(file), type: "create" };
 		}),
+	// what claude reads is what is on disk right now: no cache between phdterm's save and claude
+	read: ({ file }) =>
+		toolCall("Read", { file_path: resolve(file) }, () => {
+			const content = readFileSync(resolve(file), "utf8");
+			record({ event: "read", file, content });
+			return { type: "text", file: { filePath: resolve(file), content } };
+		}),
 	bash: ({ command }) =>
 		toolCall("Bash", { command }, () => {
 			const out = spawnSync("sh", ["-c", command], { cwd: process.cwd(), encoding: "utf8" });

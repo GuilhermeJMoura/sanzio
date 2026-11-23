@@ -1,10 +1,13 @@
 export interface FakeClaudeRecord {
-	event: "start" | "input" | "resize" | "hook" | "done";
+	event: "start" | "input" | "resize" | "hook" | "done" | "read";
 	/** control op id, on "done" */
 	id?: string;
 	/** hook event name and tool, on "hook" */
 	name?: string;
 	tool?: string;
+	/** file and the content claude saw, on "read" */
+	file?: string;
+	content?: string;
 	argv?: string[];
 	cwd?: string;
 	env?: Record<string, string | undefined>;
@@ -18,6 +21,7 @@ export type FakeClaudeOp =
 	| { op: "edit"; file: string; old: string; new: string }
 	| { op: "write"; file: string; content: string }
 	| { op: "bash"; command: string }
+	| { op: "read"; file: string }
 	| { op: "edit-interrupted"; file: string };
 
 export interface PhdtermRunOptions {
@@ -48,6 +52,8 @@ export interface PhdtermRun {
 	screen(): Promise<string>;
 	/** Resolves with the screen once `predicate` holds for it. */
 	waitForScreen(predicate: (screen: string) => boolean, label: string, timeoutMs?: number): Promise<string>;
+	/** Clicks (press and release) the first cell of the `nth` match of `text` on screen, or of `regex` group 0. */
+	click(text: string | RegExp, options?: { nth?: number; double?: boolean }): Promise<void>;
 	exited: Promise<number>;
 	kill(): void;
 }

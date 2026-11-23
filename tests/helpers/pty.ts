@@ -102,6 +102,8 @@ export function startPhdterm(options: PhdtermRunOptions): PhdtermRun {
 		}
 	};
 
+	const sgrClick = (col: number, row: number) => `\x1b[<0;${col};${row}M\x1b[<0;${col};${row}m`;
+
 	return {
 		cwd: options.cwd,
 		logFile,
@@ -134,6 +136,26 @@ export function startPhdterm(options: PhdtermRunOptions): PhdtermRun {
 				if (Date.now() > deadline) throw new Error(`timed out waiting for ${label}; screen:\n${last}`);
 				await Bun.sleep(25);
 			}
+		},
+		click: async (text, clickOptions = {}) => {
+			const lines = (await screen()).split("\n");
+			let seen = 0;
+			for (const [row, line] of lines.entries()) {
+				const pattern = typeof text === "string" ? null : new RegExp(text.source, `${text.flags.replace("g", "")}g`);
+				const hits: number[] = [];
+				if (pattern) for (const m of line.matchAll(pattern)) hits.push(m.index ?? 0);
+				else
+					for (let at = line.indexOf(text as string); at >= 0; at = line.indexOf(text as string, at + 1)) hits.push(at);
+				for (const at of hits) {
+					if (seen++ !== (clickOptions.nth ?? 0)) continue;
+					// screen cells are code points: the column is the count of characters before the match
+					const col = [...line.slice(0, at)].length + 1;
+					proc.terminal?.write(sgrClick(col, row + 1));
+					if (clickOptions.double) proc.terminal?.write(sgrClick(col, row + 1));
+					return;
+				}
+			}
+			throw new Error(`nothing to click: ${String(text)} not on screen:\n${lines.join("\n")}`);
 		},
 		// the PTY can still hold output when the process exits: wait for EOF too
 		exited: proc.exited.then(async (code) => {
