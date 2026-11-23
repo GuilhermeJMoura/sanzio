@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SessionInfo } from "$types/session.ts";
-import { projectSlug, watchSession } from "../src/session-info.ts";
+import { mergeSessionInfo, projectSlug, watchSession } from "../src/session-info.ts";
 import { tempDir } from "./helpers/pty.ts";
 
 const assistant = (model: string, effort: string, stop: string) =>
@@ -48,5 +48,28 @@ describe("AC8 the title follows claude's own session", () => {
 			(i) => i.model !== null,
 		);
 		expect(info).toEqual({ model: "Opus 5.5", effort: "high", state: "idle" });
+	});
+
+	test("a pasted image line bigger than the read window keeps model and effort", async () => {
+		const { configDir, cwd, transcript } = setup();
+		const image = { type: "image", source: { type: "base64", data: "A".repeat(700 * 1024) } };
+		writeFileSync(transcript("big"), assistant("claude-opus-5-5", "high", "end_turn"));
+		appendFileSync(
+			transcript("big"),
+			`${JSON.stringify({ type: "user", message: { content: [image, { type: "text", text: "what is this?" }] } })}\n`,
+		);
+		writeFileSync(join(configDir, "sessions", "77.json"), JSON.stringify({ pid: 77, sessionId: "big", cwd }));
+
+		const info = await firstInfo(
+			{ cwd, pid: 77, since: 0, env: { CLAUDE_CONFIG_DIR: configDir } },
+			(i) => i.model !== null,
+		);
+		expect(info).toEqual({ model: "Opus 5.5", effort: "high", state: "working" });
+	});
+
+	test("a read with no data never wipes the last known values", () => {
+		const known: SessionInfo = { model: "Opus 5.5", effort: "high", state: "working" };
+		expect(mergeSessionInfo(known, { model: null, effort: null, state: null })).toEqual(known);
+		expect(mergeSessionInfo(known, { model: null, effort: null, state: "idle" })).toEqual({ ...known, state: "idle" });
 	});
 });

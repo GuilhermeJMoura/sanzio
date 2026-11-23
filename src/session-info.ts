@@ -8,7 +8,10 @@ import type { SessionInfo, SessionState, WatchSessionOptions } from "$types/sess
 // read only the few fields we need and skip anything that does not look as expected.
 
 const STATE_LABELS: Record<SessionState, string> = { working: "trabalhando", idle: "ocioso" };
-const TAIL_BYTES = 256 * 1024;
+const CHUNK_BYTES = 256 * 1024;
+// a pasted image puts megabytes of base64 in one line; stop looking for an assistant line after this
+const MAX_TAIL_BYTES = 8 * 1024 * 1024;
+const ASSISTANT_MARK = '"type":"assistant"';
 const POLL_MS = 1000;
 
 const isObject = (value: unknown): value is JsonObject =>
@@ -62,6 +65,15 @@ function userState(entry: JsonObject, message: JsonObject): SessionState | null 
 	return text.length > 0 ? "working" : null;
 }
 
+/** A read that found nothing (e.g. only part of a huge line) keeps what we already knew. */
+export function mergeSessionInfo(previous: SessionInfo, next: SessionInfo): SessionInfo {
+	return {
+		model: next.model ?? previous.model,
+		effort: next.effort ?? previous.effort,
+		state: next.state ?? previous.state,
+	};
+}
+
 export function parseTranscript(text: string): SessionInfo {
 	const info: SessionInfo = { model: null, effort: null, state: null };
 	for (const line of text.split("\n")) {
@@ -86,16 +98,26 @@ export function parseTranscript(text: string): SessionInfo {
 	return info;
 }
 
+// drops the first line when the read started in the middle of it
+const completeLines = (buffer: Buffer, start: number) =>
+	start === 0 ? buffer : buffer.subarray(buffer.indexOf(0x0a) + 1);
+
+/** Reads the end of a transcript backwards, chunk by chunk, until it holds a whole assistant line. */
 async function readTail(file: string): Promise<string> {
 	const handle = await open(file, "r");
 	try {
 		const { size } = await handle.stat();
-		const start = Math.max(0, size - TAIL_BYTES);
-		const buffer = Buffer.alloc(size - start);
-		await handle.read(buffer, 0, buffer.length, start);
-		const text = buffer.toString("utf8");
-		// drop the first line when we started in the middle of it
-		return start > 0 ? text.slice(text.indexOf("\n") + 1) : text;
+		let start = size;
+		let tail = Buffer.alloc(0);
+		while (start > 0 && size - start < MAX_TAIL_BYTES) {
+			const next = Math.max(0, start - CHUNK_BYTES);
+			const chunk = Buffer.alloc(start - next);
+			await handle.read(chunk, 0, chunk.length, next);
+			tail = Buffer.concat([chunk, tail]);
+			start = next;
+			if (completeLines(tail, start).includes(ASSISTANT_MARK)) break;
+		}
+		return completeLines(tail, start).toString("utf8");
 	} finally {
 		await handle.close();
 	}
@@ -142,6 +164,7 @@ export function watchSession(
 	onChange: (info: SessionInfo) => void,
 ): () => void {
 	const configDir = configDirOf(env);
+	let info: SessionInfo = { model: null, effort: null, state: null };
 	let lastKey = "";
 	let busy = false;
 	const tick = async () => {
@@ -155,7 +178,8 @@ export function watchSession(
 			const key = `${file}:${mtimeMs}:${size}`;
 			if (key === lastKey) return;
 			lastKey = key;
-			onChange(parseTranscript(await readTail(file)));
+			info = mergeSessionInfo(info, parseTranscript(await readTail(file)));
+			onChange(info);
 		} catch {
 			// a transcript we cannot read leaves the title as it was
 		} finally {
