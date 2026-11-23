@@ -97,6 +97,8 @@ export function createEditor(
 		width: "100%",
 		height: "100%",
 		wrapMode: "none",
+		// the viewer shows the raw source: highlight colors only, never hidden markup (# of a heading, fences)
+		conceal: false,
 		fg: d.fg,
 		onHighlight: (highlights) => [...highlights, ...extra],
 	});
