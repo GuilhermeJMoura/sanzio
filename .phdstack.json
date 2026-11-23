@@ -1,18 +1,18 @@
 {
-  "base": "main",
-  "typecheck": "bunx tsc --noEmit",
-  "lint": "bunx biome check .",
-  "test": "bun test",
-  "testChanged": "bun test {files}",
-  "dev": "bun run src/cli.ts",
-  "heavyLock": "~/jstack-tools/heavy-lock.sh",
-  "smoke": [],
-  "surfaces": [
-    {
-      "when": "src/",
-      "app": "Maestri",
-      "window": "phdterm",
-      "start": "bun link && phdterm"
-    }
-  ]
+	"base": "main",
+	"typecheck": "bunx tsc --noEmit",
+	"lint": "bunx biome check .",
+	"test": "bun test",
+	"testChanged": "",
+	"dev": "bun run src/cli.ts",
+	"heavyLock": "~/jstack-tools/heavy-lock.sh",
+	"smoke": [],
+	"surfaces": [
+		{
+			"when": "src/",
+			"app": "Maestri",
+			"window": "phdterm",
+			"start": "bun link && phdterm"
+		}
+	]
 }
