@@ -7,7 +7,12 @@ afterEach(() => server?.stop());
 
 function start(token = "s3cret") {
 	const events: HookEvent[] = [];
-	server = startHookServer({ token, onEvent: (e) => events.push(e) });
+	server = startHookServer({
+		token,
+		onEvent: (e) => {
+			events.push(e);
+		},
+	});
 	return { events, url: server.url };
 }
 

@@ -18,7 +18,9 @@ describe("AC6 Maestri env and resume line", () => {
 		run = await startReady({ cwd: tempDir("phdterm-env-"), env: maestriEnv, path, args: ["--resume", "abc-123"] });
 		const start = run.records().find((r) => r.event === "start");
 		expect(start?.env).toMatchObject({ ...maestriEnv, PATH: path });
-		expect(start?.argv).toEqual(["--resume", "abc-123"]);
+		// phdterm's own --settings (the follow hooks) comes first, then the user's args untouched
+		expect(start?.argv?.[0]).toBe("--settings");
+		expect(start?.argv?.slice(2)).toEqual(["--resume", "abc-123"]);
 	});
 
 	test("on exit the resume line is printed as phdterm --resume <id>", async () => {

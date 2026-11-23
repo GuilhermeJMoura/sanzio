@@ -59,7 +59,8 @@ export function startHookServer({ token, onEvent }: HookServerOptions): HookServ
 				return new Response(null, { status: 400 });
 			}
 			const event = parseHookPayload(payload);
-			if (event) onEvent(event);
+			// answered only once handled: a PreToolUse snapshot must be read before the tool writes
+			if (event) await onEvent(event);
 			// an empty 2xx body tells claude "no decision": the tool goes on as usual
 			return new Response(null, { status: 200 });
 		},

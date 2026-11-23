@@ -41,7 +41,7 @@ export interface HookEvent {
 
 export interface HookServerOptions {
 	token: string;
-	onEvent: (event: HookEvent) => void;
+	onEvent: (event: HookEvent) => void | Promise<void>;
 }
 
 export interface HookServer {

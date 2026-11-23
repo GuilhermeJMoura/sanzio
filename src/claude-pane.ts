@@ -2,9 +2,14 @@ import { writeSync } from "node:fs";
 import { constants } from "node:os";
 import { BoxRenderable, type CliRenderer, createCliRenderer, EmbeddedTerminalRenderable } from "@opentui/core";
 import type { ClaudeLaunch } from "$types/pane.ts";
+import { HOOK_TOKEN_ENV, hookSettings, startHookServer } from "./observe/hook-server.ts";
+import { repoInfo } from "./observe/watcher.ts";
 import { formatTitle, watchSession } from "./session-info.ts";
+import { DRACULA } from "./ui/theme.ts";
+import { createWorkspace } from "./workspace.ts";
 
-const DRACULA = { bg: "#282a36", accent: "#bd93f9" } as const;
+// the status line takes the last row
+const STATUS_ROWS = 1;
 const RESUME_HEADER = "Resume this session with:";
 const OUTPUT_TAIL_CHARS = 64 * 1024;
 const EOF_GRACE_MS = 300;
@@ -24,8 +29,10 @@ export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; t
 		id: "claude-terminal",
 		width: "100%",
 		flexGrow: 1,
+		flexShrink: 1,
+		minHeight: 0,
 		cols: Math.max(1, renderer.width - 2),
-		rows: Math.max(1, renderer.height - 2),
+		rows: Math.max(1, renderer.height - 2 - STATUS_ROWS),
 		transparentBackground: true,
 	});
 	box.add(terminal);
@@ -53,7 +60,7 @@ function exitCodeOf(proc: Bun.Subprocess): number {
 	return signalCode ? 128 + constants.signals[signalCode] : 1;
 }
 
-/** Runs claude full screen inside a Dracula pane and resolves with claude's exit code once the terminal is restored. */
+/** Runs claude inside the phdterm workspace and resolves with claude's exit code once the terminal is restored. */
 export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 	const startedAt = Date.now();
 	const renderer = await createCliRenderer({
@@ -62,9 +69,16 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 		useMouse: true,
 		backgroundColor: DRACULA.bg,
 	});
-	const { box, terminal } = createClaudePane(renderer);
-	renderer.root.add(box);
+	const pane = createClaudePane(renderer);
+	const { box, terminal } = pane;
+	const workspace = createWorkspace(renderer, repoInfo(launch.cwd), pane);
+	renderer.root.add(workspace.root);
 	terminal.focus();
+
+	// claude's own settings stay untouched: phdterm's hooks ride on --settings, merged over the user's
+	const token = crypto.randomUUID();
+	const hooks = startHookServer({ token, onEvent: (event) => workspace.hook(event) });
+	void workspace.start();
 
 	let tail = "";
 	const decoder = new TextDecoder();
@@ -73,12 +87,12 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 		markEof = resolve;
 	});
 
-	const proc = Bun.spawn([launch.command, ...launch.args], {
+	const proc = Bun.spawn([launch.command, "--settings", JSON.stringify(hookSettings(hooks.url)), ...launch.args], {
 		cwd: launch.cwd,
-		env: launch.env,
+		env: { ...launch.env, [HOOK_TOKEN_ENV]: token },
 		terminal: {
 			cols: Math.max(1, renderer.width - 2),
-			rows: Math.max(1, renderer.height - 2),
+			rows: Math.max(1, renderer.height - 2 - STATUS_ROWS),
 			name: "xterm-256color",
 			data: (_pty, data) => {
 				terminal.write(data);
@@ -97,11 +111,14 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 
 	const stopWatching = watchSession({ cwd: launch.cwd, pid: proc.pid, since: startedAt, env: launch.env }, (info) => {
 		box.title = formatTitle(info);
+		workspace.setSessionState(info.state);
 	});
 
 	await proc.exited;
 	await Promise.race([eof, Bun.sleep(EOF_GRACE_MS)]);
 	stopWatching();
+	workspace.stop();
+	hooks.stop();
 	renderer.destroy();
 	await renderer.closed;
 

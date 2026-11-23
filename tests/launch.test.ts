@@ -13,9 +13,9 @@ describe("AC1 phdterm opens the TUI with claude in the current folder", () => {
 		const start = run.records().find((r) => r.event === "start");
 		expect(start?.cwd).toBe(folder);
 		expect(run.output()).toContain("\x1b[?1049h");
-		// the rounded pane takes one cell on each side
+		// the rounded pane takes one cell on each side, the status line the last row
 		expect(start?.cols).toBe(98);
-		expect(start?.rows).toBe(28);
+		expect(start?.rows).toBe(27);
 		expect(run.output()).toContain("╭");
 	});
 

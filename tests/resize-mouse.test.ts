@@ -11,7 +11,7 @@ describe("AC4 scroll and resize", () => {
 		const r = run;
 		r.resize(140, 45);
 		await r.waitFor(
-			() => r.records().some((x) => x.event === "resize" && x.cols === 138 && x.rows === 43),
+			() => r.records().some((x) => x.event === "resize" && x.cols === 138 && x.rows === 42),
 			"child resize",
 		);
 	});
