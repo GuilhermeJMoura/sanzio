@@ -21,8 +21,8 @@ export function createEditController(deps: {
 	changes: SessionChanges;
 	now: () => number;
 	render: () => void;
-	/** edit mode started or needs the user: pause follow, show and focus the editor */
-	onStart: () => void;
+	/** edit mode started or needs the user: pause follow, show and focus the editor on `path` */
+	onStart: (path: string) => void;
 }) {
 	const { surface } = deps;
 	let session: { path: string; format: DocFormat; disk: string } | null = null;
@@ -98,6 +98,35 @@ export function createEditController(deps: {
 		deps.render();
 	};
 
+	/** Runs `action` (it moves the editor off the edited file) once no unsaved text would be lost, asking first. */
+	const guard = (action: () => void, reason: PromptReason = "switch") => {
+		if (!session) return action();
+		if (!dirty()) {
+			stop();
+			return action();
+		}
+		deps.onStart(session.path);
+		ask(reason, action);
+	};
+
+	/** `i` or a double click: edit `path` from disk with the cursor on the 1-based `line`. */
+	const enter = async (path: string, line: number): Promise<void> => {
+		if (session?.path === path) return;
+		// another file is being edited: its unsaved text is settled first
+		if (session) return guard(() => void enter(path, line), "switch");
+		const raw = await readText(join(deps.root, path));
+		if (raw === null) {
+			readOnly = path;
+			return deps.render();
+		}
+		const { text, format } = parseDoc(raw);
+		session = { path, format, disk: text };
+		surface.load(text, line);
+		history = new EditHistory(surface.snapshot());
+		deps.onStart(path);
+		deps.render();
+	};
+
 	const step = (snapshot: ReturnType<EditHistory["undo"]>) => {
 		if (snapshot) surface.set(snapshot);
 		deps.render();
@@ -116,21 +145,7 @@ export function createEditController(deps: {
 				readOnly: path !== null && readOnly === path,
 			};
 		},
-		/** `i` or a double click: edit `path` from disk with the cursor on the 1-based `line`. */
-		async enter(path: string, line: number) {
-			if (session?.path === path) return;
-			const raw = await readText(join(deps.root, path));
-			if (raw === null) {
-				readOnly = path;
-				return deps.render();
-			}
-			const { text, format } = parseDoc(raw);
-			session = { path, format, disk: text };
-			surface.load(text, line);
-			history = new EditHistory(surface.snapshot());
-			deps.onStart();
-			deps.render();
-		},
+		enter,
 		/** Keys on the edit surface before it handles them; anything not taken here is typing. */
 		key(key: KeyEvent) {
 			if (!session) return;
@@ -173,16 +188,7 @@ export function createEditController(deps: {
 		},
 		conflict: (action: ConflictAction) => void resolveConflict(action),
 		prompt: (action: PromptAction) => void answer(action),
-		/** Runs `action` (it opens another file) once no unsaved text would be lost, asking first when some would. */
-		guard(action: () => void) {
-			if (!session) return action();
-			if (!dirty()) {
-				stop();
-				return action();
-			}
-			deps.onStart();
-			ask("switch", action);
-		},
+		guard,
 		/** The file changed on disk (claude, or anyone but this editor). */
 		external(path: string, raw: string | null) {
 			if (!session || session.path !== path || raw === null) return;
@@ -203,7 +209,7 @@ export function createEditController(deps: {
 			if (!dirty()) return Promise.resolve();
 			return new Promise((resolve) => {
 				exitWaiter = resolve;
-				deps.onStart();
+				if (session) deps.onStart(session.path);
 				ask("exit", null);
 			});
 		},

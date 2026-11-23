@@ -65,7 +65,7 @@ export function focusPane(s: WorkspaceState, pane: PaneId): WorkspaceState {
 	return { ...s, focus: pane };
 }
 
-/** Edit mode started (or needs an answer): follow pauses and the editor shows with the focus. */
-export function startEditing(s: WorkspaceState): WorkspaceState {
-	return { ...s, follow: "paused", focus: "editor", manual: workspaceVisible(s) ? s.manual : true };
+/** Edit mode started (or needs an answer): follow pauses and the editor shows the edited file with the focus. */
+export function startEditing(s: WorkspaceState, path: string): WorkspaceState {
+	return { ...open(s, path), follow: "paused", focus: "editor", manual: workspaceVisible(s) ? s.manual : true };
 }

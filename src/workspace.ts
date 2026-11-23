@@ -152,6 +152,8 @@ export function createWorkspace(
 		else if (!files.includes(path)) files = [...files, path];
 		if (!byClaude) return;
 		for (const dir of ancestors(path)) expanded.add(dir);
+		// never follow away from the file being edited
+		if (editing.active()) state = { ...state, follow: "paused" };
 		state = claudeEdited(state, path);
 	};
 
@@ -164,10 +166,9 @@ export function createWorkspace(
 	};
 
 	const onToggleFollow = () => {
-		const last = lastEditPath();
-		const switches = state.follow === "paused" && last !== null && last !== state.open;
 		const toggle = () => set(toggleFollow(state, lastEditPath()));
-		if (switches) editing.guard(toggle);
+		// following moves the editor on claude's next edit: edit mode ends first, unsaved text asks
+		if (state.follow === "paused" && editing.active()) editing.guard(toggle, "follow");
 		else toggle();
 	};
 
@@ -226,8 +227,8 @@ export function createWorkspace(
 		changes,
 		now,
 		render,
-		onStart: () => {
-			state = startEditing(state);
+		onStart: (path) => {
+			state = startEditing(state, path);
 		},
 	});
 

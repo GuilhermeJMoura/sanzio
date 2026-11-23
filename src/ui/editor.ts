@@ -55,6 +55,7 @@ function title(model: EditorModel): string {
 
 const PROMPT_TEXT = {
 	switch: "alterações não salvas · trocar de arquivo?",
+	follow: "alterações não salvas · voltar a seguir o claude?",
 	leave: "alterações não salvas · sair da edição?",
 	exit: "o claude saiu · alterações não salvas",
 } as const;

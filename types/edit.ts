@@ -19,7 +19,7 @@ export interface EditSnapshot {
 }
 
 /** Why phdterm asks salvar / descartar / cancelar before it drops unsaved text. */
-export type PromptReason = "switch" | "leave" | "exit";
+export type PromptReason = "switch" | "follow" | "leave" | "exit";
 
 export type PromptAction = "save" | "discard" | "cancel";
 

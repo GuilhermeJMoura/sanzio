@@ -250,3 +250,49 @@ describe("AC8 claude reads what I saved", () => {
 		expect(read?.content).toBe(`X${NOTES}\n`);
 	});
 });
+
+describe("fix: follow never moves the editor away from unsaved text", () => {
+	test("turning follow back on while dirty asks; cancel keeps follow paused and claude's next edit only notifies", async () => {
+		run = await openNotes();
+		const r = run;
+		await r.click("f seguir");
+		await r.waitForScreen((s) => s.includes("SEGUINDO"), "follow on");
+		await r.claude({ op: "edit", file: "src/a.ts", old: "export const a = 1;", new: "export const a = 2;" });
+		await r.waitForScreen((s) => s.includes("╭─ src/a.ts") && s.includes("SEGUINDO"), "following src/a.ts");
+		await r.click("export const a = 2;");
+		await Bun.sleep(100);
+		r.write("i");
+		await r.waitForScreen((s) => s.includes("EDITANDO"), "EDITANDO");
+		await type(r, "x");
+		await r.click("f seguir");
+		await r.waitForScreen((s) => s.includes("voltar a seguir o claude?"), "prompt before follow resumes");
+		r.write(KEY.esc);
+		let s = await r.waitForScreen((x) => !x.includes("voltar a seguir o claude?"), "cancelled");
+		expect(s).toContain("PAUSADO");
+		await r.claude({ op: "edit", file: "config.json", old: "3600", new: "60" });
+		s = await r.waitForScreen((x) => x.includes("o claude editou config.json"), "notice only");
+		expect(s).toContain("╭─ src/a.ts ●");
+		expect(s).toContain("EDITANDO ●");
+	});
+
+	test("salvar at that prompt writes my text, then follow resumes and goes to claude's next file", async () => {
+		run = await openNotes();
+		const r = run;
+		await r.click("f seguir");
+		await r.waitForScreen((s) => s.includes("SEGUINDO"), "follow on");
+		await r.claude({ op: "edit", file: "src/a.ts", old: "export const a = 1;", new: "export const a = 2;" });
+		await r.waitForScreen((s) => s.includes("╭─ src/a.ts") && s.includes("SEGUINDO"), "following src/a.ts");
+		await r.click("export const a = 2;");
+		await Bun.sleep(100);
+		r.write("i");
+		await r.waitForScreen((s) => s.includes("EDITANDO"), "EDITANDO");
+		await type(r, "x");
+		await r.click("f seguir");
+		await r.waitForScreen((s) => s.includes("voltar a seguir o claude?"), "prompt");
+		r.write("s");
+		await r.waitForScreen((s) => s.includes("SEGUINDO") && !s.includes("EDITANDO"), "following again");
+		expect(disk(r, "src/a.ts")).toBe("xexport const a = 2;\n");
+		await r.claude({ op: "edit", file: "config.json", old: "3600", new: "60" });
+		await r.waitForScreen((s) => s.includes("╭─ config.json"), "editor follows claude");
+	});
+});
