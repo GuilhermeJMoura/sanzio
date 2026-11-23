@@ -23,8 +23,9 @@ function isHunk(value: unknown): value is PatchHunk {
 /** Keeps what phdterm needs from a PreToolUse / PostToolUse payload; null for anything else. */
 export function parseHookPayload(payload: unknown): HookEvent | null {
 	if (!isObject(payload)) return null;
-	const phase =
-		payload.hook_event_name === "PreToolUse" ? "pre" : payload.hook_event_name === "PostToolUse" ? "post" : null;
+	const name = payload.hook_event_name;
+	// a failed call (PostToolUseFailure) ends the call too: without it a Pre would keep claude busy forever
+	const phase = name === "PreToolUse" ? "pre" : name === "PostToolUse" || name === "PostToolUseFailure" ? "post" : null;
 	const tool = asString(payload.tool_name);
 	if (!phase || !tool) return null;
 	const input = isObject(payload.tool_input) ? payload.tool_input : {};
@@ -37,6 +38,7 @@ export function parseHookPayload(payload: unknown): HookEvent | null {
 	return {
 		phase,
 		tool,
+		toolUseId: asString(payload.tool_use_id),
 		file: asString(input.file_path) ?? asString(input.notebook_path),
 		patch: patch && patch.length > 0 ? patch : null,
 		changedFiles,
@@ -83,5 +85,5 @@ export function hookSettings(url: string): HookSettings {
 			],
 		},
 	];
-	return { hooks: { PreToolUse: group(), PostToolUse: group() } };
+	return { hooks: { PreToolUse: group(), PostToolUse: group(), PostToolUseFailure: group() } };
 }

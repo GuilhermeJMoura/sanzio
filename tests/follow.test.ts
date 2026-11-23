@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { PhdtermRun } from "$types/testing.ts";
+import { projectSlug } from "../src/session-info.ts";
 import { startReady } from "./helpers/pty.ts";
 import { gitRepo, sedInPlace } from "./helpers/repo.ts";
 
@@ -14,8 +17,8 @@ async function shownWithin(r: PhdtermRun, act: () => Promise<void>, seen: (scree
 	return performance.now() - started;
 }
 
-const start = async () => {
-	const r = await startReady({ cwd: gitRepo(), cols: 120, rows: 34 });
+const start = async (cols = 120) => {
+	const r = await startReady({ cwd: gitRepo(), cols, rows: 34 });
 	await Bun.sleep(200); // session-start snapshot and watcher
 	return r;
 };
@@ -86,5 +89,30 @@ describe("focus: f and ctrl+e belong to phdterm only outside the claude pane", (
 		r.write("\x05"); // ctrl+e
 		await r.waitForScreen((s) => !s.includes("╭─ explorer") && s.includes("editor escondido"), "workspace hidden");
 		expect(r.inputs().length).toBe(typed);
+	});
+});
+
+describe("a tool call that never finishes does not keep claude busy", () => {
+	test("Pre with no Post, then claude goes idle: the user's own save is not claude's and the status is idle", async () => {
+		run = await start(160); // wide enough for "claude em" beside the conversation-mode hints
+		const r = run;
+		await r.claude({ op: "edit-interrupted", file: "src/a.ts" });
+		await r.waitForScreen((s) => s.includes("claude em src/a.ts"), "claude on src/a.ts");
+
+		// esc: claude writes the interruption and stops
+		const dir = join(r.configDir, "projects", projectSlug(r.cwd));
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(
+			join(dir, "5f0c2a1e-1111-4222-8333-944455556666.jsonl"),
+			`${JSON.stringify({ type: "user", message: { content: "[Request interrupted by user]" } })}\n`,
+		);
+		await r.waitForScreen((s) => s.includes("claude ocioso"), "claude idle", 4000);
+
+		writeFileSync(join(r.cwd, "config.json"), '{ "ttl": 1 }\n');
+		await Bun.sleep(800);
+		const s = await r.screen();
+		expect(s).toContain("claude ocioso");
+		expect(s).toContain("+0 −0 · 0 arq");
+		expect(s).not.toContain("╭─ explorer");
 	});
 });

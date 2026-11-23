@@ -17,7 +17,8 @@ export interface FakeClaudeRecord {
 export type FakeClaudeOp =
 	| { op: "edit"; file: string; old: string; new: string }
 	| { op: "write"; file: string; content: string }
-	| { op: "bash"; command: string };
+	| { op: "bash"; command: string }
+	| { op: "edit-interrupted"; file: string };
 
 export interface PhdtermRunOptions {
 	args?: string[];
@@ -32,6 +33,7 @@ export interface PhdtermRunOptions {
 }
 
 export interface PhdtermRun {
+	cwd: string;
 	logFile: string;
 	configDir: string;
 	write(data: string): void;

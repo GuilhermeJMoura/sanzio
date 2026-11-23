@@ -6,6 +6,7 @@ import type { SessionState } from "$types/session.ts";
 import type { ExplorerItem, PaneId, WorkspaceState, WorkspaceViewModel } from "$types/workspace.ts";
 import { addedLines } from "./observe/diff.ts";
 import { SessionChanges } from "./observe/session-changes.ts";
+import { ToolCalls } from "./observe/tool-calls.ts";
 import { gitBranch, gitMarks, listFiles, readSnapshot, readText, watchTree } from "./observe/watcher.ts";
 import { explorerItems } from "./ui/explorer.ts";
 import { ancestors, changedRows, treeRows } from "./ui/explorer-rows.ts";
@@ -42,13 +43,12 @@ export function createWorkspace(
 	let marks = new Map<string, GitMark>();
 	let cursor = 0;
 	let sessionState: SessionState | null = null;
-	let inFlight = 0;
-	let currentFile: string | null = null;
+	const calls = new ToolCalls();
 	let graceUntil = 0;
 	let stopWatch: () => void = () => {};
 	let items: ExplorerItem[] = [];
 
-	const claudeActive = () => inFlight > 0 || now() < graceUntil || sessionState === "working";
+	const claudeActive = () => calls.active(now()) || now() < graceUntil || sessionState === "working";
 	const lastEditPath = () => changes.lastEdit?.path ?? null;
 
 	const toRelative = (file: string | null): string | null => {
@@ -67,7 +67,7 @@ export function createWorkspace(
 
 	const viewModel = (): WorkspaceViewModel => {
 		const busy = claudeActive();
-		const current = busy ? (currentFile ?? lastEditPath()) : null;
+		const current = busy ? (calls.current() ?? lastEditPath()) : null;
 		const edits = changes.claudeEdits();
 		const explorer = {
 			rootName: basename(repo.root),
@@ -222,27 +222,28 @@ export function createWorkspace(
 		},
 		async hook(event: HookEvent) {
 			const path = toRelative(event.file);
+			const callId = event.toolUseId ?? `${event.tool}:${event.file ?? ""}`;
 			if (event.phase === "pre") {
-				inFlight++;
+				calls.start(callId, path, now());
 				if (path) {
-					currentFile = path;
 					toolOnFile.set(path, event.tool);
 					await ensureBase(path);
 				}
 				return render();
 			}
-			inFlight = Math.max(0, inFlight - 1);
+			calls.end(callId);
 			graceUntil = now() + TOOL_GRACE_MS;
 			if (path && event.tool !== "Bash") {
 				await applyFile(path, true, event.tool, event.patch ? addedLines(event.patch) : undefined);
 				toolOnFile.delete(path);
 			}
-			if (inFlight === 0) currentFile = null;
 			const bashFiles = event.changedFiles.map(toRelative).filter((p): p is string => p !== null);
 			await filesChanged(bashFiles, true);
 		},
 		setSessionState(next: SessionState | null) {
 			sessionState = next;
+			// idle after an interrupt or a denied permission: the calls that never got their Post are over
+			if (next === "idle") calls.clear();
 			render();
 		},
 		stop() {

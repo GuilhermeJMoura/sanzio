@@ -103,6 +103,7 @@ export function startPhdterm(options: PhdtermRunOptions): PhdtermRun {
 	};
 
 	return {
+		cwd: options.cwd,
 		logFile,
 		configDir,
 		write: (data) => {

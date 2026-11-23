@@ -92,8 +92,9 @@ async function runHooks(name, payload) {
 	record({ event: "hook", name, tool: payload.tool_name });
 }
 
+let toolUses = 0;
 async function toolCall(tool, input, run) {
-	const base = { session_id: "fake", cwd: process.cwd(), tool_name: tool, tool_input: input };
+	const base = { session_id: "fake", cwd: process.cwd(), tool_name: tool, tool_input: input, tool_use_id: `toolu_${++toolUses}` };
 	await runHooks("PreToolUse", { ...base, hook_event_name: "PreToolUse" });
 	const response = run();
 	await runHooks("PostToolUse", { ...base, hook_event_name: "PostToolUse", tool_response: response });
@@ -113,6 +114,16 @@ function edit({ file, old, new: replacement }) {
 }
 
 const ops = {
+	// a call that never finishes: denied permission or esc, so claude sends no PostToolUse
+	"edit-interrupted": ({ file }) =>
+		runHooks("PreToolUse", {
+			session_id: "fake",
+			cwd: process.cwd(),
+			hook_event_name: "PreToolUse",
+			tool_name: "Edit",
+			tool_input: { file_path: resolve(file), old_string: "x", new_string: "y" },
+			tool_use_id: `toolu_${++toolUses}`,
+		}),
 	edit,
 	write: ({ file, content }) =>
 		toolCall("Write", { file_path: resolve(file), content }, () => {

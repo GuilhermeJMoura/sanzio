@@ -32,6 +32,8 @@ export type HookPhase = "pre" | "post";
 export interface HookEvent {
 	phase: HookPhase;
 	tool: string;
+	/** pairs a PreToolUse with its PostToolUse / PostToolUseFailure */
+	toolUseId: string | null;
 	/** absolute path of the file the tool works on, when it has one */
 	file: string | null;
 	patch: PatchHunk[] | null;
@@ -104,5 +106,10 @@ export interface HookMatcherGroup {
 
 /** The slice of Claude Code settings phdterm passes with `--settings`. */
 export interface HookSettings {
-	hooks: Record<"PreToolUse" | "PostToolUse", HookMatcherGroup[]>;
+	hooks: Record<"PreToolUse" | "PostToolUse" | "PostToolUseFailure", HookMatcherGroup[]>;
+}
+
+export interface ToolCall {
+	file: string | null;
+	at: number;
 }
