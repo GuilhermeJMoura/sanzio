@@ -1,11 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { KeyEvent } from "@opentui/core";
-import type { ConflictAction, DocFormat, EditModel, EditSurface, PromptAction, PromptReason } from "$types/edit.ts";
+import type { ConflictAction, EditModel, EditSurface, ParsedDoc, PromptAction, PromptReason } from "$types/edit.ts";
 import type { DiffRow } from "$types/observe.ts";
 import { contextRows, diffLines, splitLines } from "./observe/diff.ts";
 import type { SessionChanges } from "./observe/session-changes.ts";
-import { readEditable } from "./observe/watcher.ts";
+import { decodeStrict, MAX_EDIT_BYTES, readEditable } from "./observe/watcher.ts";
 import { EditHistory, parseDoc, serializeDoc } from "./ui/edit-buffer.ts";
 
 const PAGE_LINES = 10;
@@ -24,16 +24,18 @@ export function createEditController(deps: {
 	onStart: (path: string) => void;
 }) {
 	const { surface } = deps;
-	let session: { path: string; format: DocFormat; disk: string } | null = null;
+	// `doc` is the file as last read or saved, `raw` its exact text: the disk is compared against `raw`, never re-encoded
+	let session: { path: string; doc: ParsedDoc; raw: string } | null = null;
 	let history = new EditHistory({ text: "", cursor: 0 });
-	let conflict: { raw: string; text: string; showingDiff: boolean; rows: DiffRow[] } | null = null;
+	// `raw` is null when claude's bytes are not valid UTF-8: they can be shown, not loaded
+	let conflict: { raw: string | null; text: string; showingDiff: boolean; rows: DiffRow[] } | null = null;
 	let prompt: PromptReason | null = null;
 	let afterPrompt: (() => void) | null = null;
 	let exitWaiter: (() => void) | null = null;
 	let readOnly: string | null = null;
 	let saveError: string | null = null;
 
-	const dirty = () => session !== null && surface.snapshot().text !== session.disk;
+	const dirty = () => session !== null && surface.snapshot().text !== session.doc.text;
 
 	const stop = () => {
 		session = null;
@@ -52,18 +54,19 @@ export function createEditController(deps: {
 		history = new EditHistory(surface.snapshot());
 	};
 
-	const markConflict = (raw: string) => {
+	const markConflict = (bytes: Buffer) => {
 		if (!session) return;
-		const next = parseDoc(raw);
-		const rows = contextRows(diffLines(splitLines(session.disk), splitLines(next.text)));
-		conflict = { raw, text: next.text, showingDiff: false, rows };
+		const raw = decodeStrict(bytes);
+		const text = parseDoc(raw ?? bytes.toString("utf8")).text;
+		const rows = contextRows(diffLines(splitLines(session.doc.text), splitLines(text)));
+		conflict = { raw, text, showingDiff: false, rows };
 	};
 
 	/** What is on disk now, when it is no longer what this session opened or last saved; null when unchanged. */
-	const changedOnDisk = async (file: string, expected: string): Promise<string | null> => {
+	const changedOnDisk = async (file: string, expected: string): Promise<Buffer | null> => {
 		try {
 			const bytes = await readFile(file);
-			return bytes.equals(Buffer.from(expected)) ? null : bytes.toString("utf8");
+			return bytes.equals(Buffer.from(expected)) ? null : bytes;
 		} catch {
 			// gone: writing recreates it, and a folder that is gone fails the write below
 			return null;
@@ -77,12 +80,12 @@ export function createEditController(deps: {
 	const save = async (overwrite = false): Promise<boolean> => {
 		if (!session) return false;
 		const current = session;
-		const { path, format } = current;
+		const { path } = current;
 		const file = join(deps.root, path);
 		const text = surface.snapshot().text;
-		const raw = serializeDoc(text, format);
+		const raw = serializeDoc(text, current.doc);
 		if (!overwrite) {
-			const theirs = await changedOnDisk(file, serializeDoc(current.disk, format));
+			const theirs = await changedOnDisk(file, current.raw);
 			if (theirs !== null) {
 				markConflict(theirs);
 				deps.render();
@@ -98,7 +101,8 @@ export function createEditController(deps: {
 			return false;
 		}
 		saveError = null;
-		current.disk = text;
+		current.raw = raw;
+		current.doc = parseDoc(raw);
 		conflict = null;
 		deps.changes.apply({ path, content: raw, byClaude: false, byYou: true, tool: "phdterm", at: deps.now() });
 		// claude already left: once nothing is unsaved, phdterm can close
@@ -133,11 +137,16 @@ export function createEditController(deps: {
 			return deps.render();
 		}
 		if (action === "keep") return void (await save(true));
-		const { raw, text } = conflict;
+		const { raw } = conflict;
 		conflict = null;
-		session.disk = text;
-		session.format = parseDoc(raw).format;
-		load(text, surface.snapshot().cursor);
+		if (raw === null) {
+			// not valid UTF-8: loading it would save replacement characters later
+			readOnly = session.path;
+			return stop();
+		}
+		session.raw = raw;
+		session.doc = parseDoc(raw);
+		load(session.doc.text, surface.snapshot().cursor);
 		deps.render();
 	};
 
@@ -162,9 +171,8 @@ export function createEditController(deps: {
 			readOnly = path;
 			return deps.render();
 		}
-		const { text, format } = parseDoc(raw);
-		session = { path, format, disk: text };
-		surface.load(text, line);
+		session = { path, doc: parseDoc(raw), raw };
+		surface.load(session.doc.text, line);
 		history = new EditHistory(surface.snapshot());
 		deps.onStart(path);
 		deps.render();
@@ -234,18 +242,30 @@ export function createEditController(deps: {
 		conflict: (action: ConflictAction) => resolveConflict(action),
 		prompt: (action: PromptAction) => answer(action),
 		guard,
-		/** The file changed on disk (claude, or anyone but this editor). */
-		external(path: string, raw: string | null) {
-			if (!session || session.path !== path || raw === null) return;
-			if (raw === serializeDoc(session.disk, session.format)) return;
-			const next = parseDoc(raw);
+		/** The file changed on disk (claude, or anyone but this editor); `content` is null when it is gone. */
+		async external(path: string, content: string | null) {
+			if (!session || session.path !== path || content === null) return;
+			const current = session;
+			let bytes: Buffer;
+			try {
+				bytes = await readFile(join(deps.root, path));
+			} catch {
+				return;
+			}
+			if (session !== current || bytes.equals(Buffer.from(current.raw))) return;
+			const raw = bytes.length > MAX_EDIT_BYTES || bytes.includes(0) ? null : decodeStrict(bytes);
 			if (!dirty()) {
-				session.disk = next.text;
-				session.format = next.format;
-				load(next.text, surface.snapshot().cursor);
+				if (raw === null) {
+					// no longer editable text (invalid UTF-8, binary or too big): só leitura
+					readOnly = path;
+					return stop();
+				}
+				current.raw = raw;
+				current.doc = parseDoc(raw);
+				load(current.doc.text, surface.snapshot().cursor);
 				return deps.render();
 			}
-			markConflict(raw);
+			markConflict(bytes);
 			deps.render();
 		},
 		/** Claude exited: resolves once no unsaved text is left (saved, discarded, or there was none). */

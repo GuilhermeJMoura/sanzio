@@ -146,7 +146,7 @@ export function createWorkspace(
 
 	const applyFile = async (path: string, byClaude: boolean, tool: string, justLines?: number[]) => {
 		const content = await readText(join(repo.root, path));
-		editing.external(path, content);
+		await editing.external(path, content);
 		if (!changes.apply({ path, content, byClaude, tool, justLines, at: now() })) return;
 		if (content === null) files = files.filter((f) => f !== path);
 		else if (!files.includes(path)) files = [...files, path];

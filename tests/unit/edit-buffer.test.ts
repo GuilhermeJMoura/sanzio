@@ -12,12 +12,12 @@ describe("AC2 saving writes exactly the editor text, in the file's own format", 
 	])("%s round-trips and keeps its line ending", (_, raw, shown) => {
 		const doc = parseDoc(raw);
 		expect(doc.text).toBe(shown);
-		expect(serializeDoc(doc.text, doc.format)).toBe(raw);
+		expect(serializeDoc(doc.text, doc)).toBe(raw);
 	});
 
 	test("an edited CRLF file is written back with CRLF on every line, new lines included", () => {
-		const { format } = parseDoc("a\r\nb\r\n");
-		expect(serializeDoc("a\nX\nb", format)).toBe("a\r\nX\r\nb\r\n");
+		const doc = parseDoc("a\r\nb\r\n");
+		expect(serializeDoc("a\nX\nb", doc)).toBe("a\r\nX\r\nb\r\n");
 	});
 });
 
@@ -41,5 +41,24 @@ describe("AC3 undo / redo step by step down to the opened text", () => {
 		expect(h.undo()).toBeNull();
 		h.record({ text: "abXc", cursor: 3 });
 		expect(h.undo()).toEqual({ text: "abc", cursor: 2 });
+	});
+});
+
+describe("fix: mixed line endings are kept line by line", () => {
+	const raw = "a\r\nb\nc\r\nd\n";
+
+	test("unchanged text writes back the exact bytes", () => {
+		expect(serializeDoc(parseDoc(raw).text, parseDoc(raw))).toBe(raw);
+	});
+
+	test("an edited line keeps its own ending; a line split in two gives both halves that ending", () => {
+		const doc = parseDoc(raw);
+		expect(serializeDoc("a\nB\nc\nd", doc)).toBe("a\r\nB\nc\r\nd\n");
+		expect(serializeDoc("a\nb\nc1\nc2\nd", doc)).toBe("a\r\nb\nc1\r\nc2\r\nd\n");
+	});
+
+	test("a line added after the last one takes the ending of the line before it", () => {
+		const doc = parseDoc("a\nb\r\n");
+		expect(serializeDoc("a\nb\nz", doc)).toBe("a\nb\r\nz\r\n");
 	});
 });

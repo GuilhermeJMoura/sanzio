@@ -7,8 +7,17 @@ export type Eol = "\n" | "\r\n";
 
 /** What saving must give back exactly as the file had it on disk. */
 export interface DocFormat {
+	/** the ending most lines use, for lines nothing else decides */
 	eol: Eol;
+	/** each line's own ending as read; the last line's only counts when `finalNewline` */
+	lineEols: Eol[];
 	finalNewline: boolean;
+}
+
+/** A file as the editor shows it (LF, no final newline) and the format saving must restore. */
+export interface ParsedDoc {
+	text: string;
+	format: DocFormat;
 }
 
 /** One undo step: the text in the editor (LF line breaks) and where the cursor was. */

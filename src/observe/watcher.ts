@@ -5,6 +5,7 @@ import type { GitMark, RepoInfo, WatchTreeOptions } from "$types/observe.ts";
 
 const ALWAYS_IGNORED = new Set([".git", "node_modules"]);
 const MAX_FILE_BYTES = 1024 * 1024;
+export const MAX_EDIT_BYTES = MAX_FILE_BYTES;
 const DEBOUNCE_MS = 25;
 
 function gitSync(cwd: string, args: string[]): string | null {
@@ -93,8 +94,16 @@ export async function readEditable(path: string): Promise<string | null> {
 		const info = await stat(path);
 		if (!info.isFile() || info.size > MAX_FILE_BYTES) return null;
 		const buffer = await readFile(path);
-		if (buffer.includes(0)) return null;
-		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer);
+		return buffer.includes(0) ? null : decodeStrict(buffer);
+	} catch {
+		return null;
+	}
+}
+
+/** UTF-8 text that encodes back to the same bytes (BOM kept), or null when the bytes are not valid UTF-8. */
+export function decodeStrict(bytes: Uint8Array): string | null {
+	try {
+		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 	} catch {
 		return null;
 	}

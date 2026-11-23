@@ -319,3 +319,16 @@ describe("fix: a failed ctrl+s shows the error and phdterm keeps running", () =>
 		expect(disk(r)).toBe(`MINE ${NOTES}\n`);
 	});
 });
+
+describe("fix: a file mixing LF and CRLF saves, keeping each line's own ending", () => {
+	test("i, type on line 1, ctrl+s: written, and the untouched lines keep their bytes", async () => {
+		run = await openNotes("alpha\r\nbeta\ngamma\r\ndelta\n");
+		const r = run;
+		await startEditing(r);
+		await type(r, "X");
+		r.write(KEY.ctrlS);
+		await r.waitFor(() => disk(r) !== "alpha\r\nbeta\ngamma\r\ndelta\n", "saved", 3000);
+		expect(disk(r)).toBe("Xalpha\r\nbeta\ngamma\r\ndelta\n");
+		expect(await r.screen()).not.toContain("o claude mudou este arquivo");
+	});
+});

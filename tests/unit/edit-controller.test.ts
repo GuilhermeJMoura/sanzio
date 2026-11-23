@@ -102,3 +102,14 @@ describe("fix: a failed save keeps my text, shows the error and never exits", ()
 		expect(readFileSync(join(root, "notes.txt"), "utf8")).toBe("MINE alpha\n");
 	});
 });
+
+describe("fix: claude rewriting the edited file with invalid UTF-8 makes it só leitura", () => {
+	test("clean session: the editor leaves edit mode instead of loading replacement characters", async () => {
+		const { root, surface, edit } = setup({ "notes.txt": "café\n" });
+		await edit.enter("notes.txt", 1);
+		writeFileSync(join(root, "notes.txt"), Uint8Array.from([0x63, 0x61, 0x66, 0xe9, 0x0a]));
+		await edit.external("notes.txt", readFileSync(join(root, "notes.txt"), "utf8"));
+		expect(edit.model("notes.txt")).toMatchObject({ active: false, readOnly: true });
+		expect(surface.snapshot().text).not.toContain("�");
+	});
+});
