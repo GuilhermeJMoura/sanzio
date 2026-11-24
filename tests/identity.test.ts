@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SanzioRun, SanzioRunOptions } from "$types/testing.ts";
-import { LIGHT_NOTICE } from "../src/claude-pane.ts";
 import { HINT } from "../src/ui/splash-frame.ts";
 import { startSanzio, tempDir } from "./helpers/pty.ts";
 
@@ -97,20 +96,17 @@ describe("AC5 / AC6 theme from the config file or SANZIO_THEME", () => {
 		expect(r.output()).not.toContain("48;2;241;230;200m");
 	});
 
-	test('{"theme":"pergaminho"} paints the light theme and asks once for /theme light', async () => {
+	test('{"theme":"pergaminho"} paints the light theme', async () => {
 		const { r } = await startWithSplash({ env: { HOME: homeWithTheme("pergaminho") } });
-		const screen = await r.waitForScreen((s) => s.includes(LIGHT_NOTICE), "light notice");
+		const screen = await r.waitForScreen((s) => !s.includes(HINT), "opening gone");
 		expect(screen).not.toContain("⚠");
+		expect(screen).not.toContain("/theme light");
 		expect(r.output()).toContain("48;2;241;230;200m");
-		// the notice goes on a click
-		await r.click("×");
-		await r.waitForScreen((s) => !s.includes(LIGHT_NOTICE), "notice dismissed");
 	});
 
 	test("SANZIO_THEME wins over the file", async () => {
 		const { r } = await startWithSplash({ env: { HOME: homeWithTheme("pergaminho"), SANZIO_THEME: "verniz" } });
 		await r.waitForScreen((s) => !s.includes(HINT), "opening gone");
-		expect(await r.screen()).not.toContain(LIGHT_NOTICE);
 		expect(r.output()).not.toContain("48;2;241;230;200m");
 	});
 

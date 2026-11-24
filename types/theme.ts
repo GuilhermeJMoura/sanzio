@@ -110,3 +110,29 @@ export interface Glyph {
 }
 
 export type MaybeColor = string | null;
+
+/** The color tokens sanzio sets in its Claude Code themes. */
+export type ClaudeThemeToken =
+	| "claude"
+	| "text"
+	| "inactive"
+	| "subtle"
+	| "permission"
+	| "promptBorder"
+	| "bashBorder"
+	| "success"
+	| "error"
+	| "warning"
+	| "diffAdded"
+	| "diffRemoved"
+	| "diffAddedWord"
+	| "diffRemovedWord"
+	| "userMessageBackground"
+	| "selectionBg";
+
+/** A Claude Code custom theme file: https://code.claude.com/docs/en/terminal-config.md#create-a-custom-theme */
+export interface ClaudeThemeFile {
+	name: string;
+	base: "dark" | "light";
+	overrides: Record<ClaudeThemeToken, string>;
+}

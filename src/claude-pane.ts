@@ -1,14 +1,15 @@
 import { writeSync } from "node:fs";
 import { constants } from "node:os";
 import type { CliRenderer } from "@opentui/core";
-import { BoxRenderable, createCliRenderer, EmbeddedTerminalRenderable, TextRenderable } from "@opentui/core";
-import type { ClaudeLaunch } from "$types/pane.ts";
+import { BoxRenderable, createCliRenderer, EmbeddedTerminalRenderable } from "@opentui/core";
+import type { ClaudeLaunch, ClaudeSettings } from "$types/pane.ts";
+import { claudeThemeKey, PLUGIN_DIR } from "./claude-theme.ts";
 import { loadTheme } from "./config.ts";
 import { HOOK_TOKEN_ENV, hookSettings, startHookServer } from "./observe/hook-server.ts";
 import { repoInfo } from "./observe/watcher.ts";
 import { formatTitle, watchSession } from "./session-info.ts";
 import { createSplash } from "./ui/splash.ts";
-import { styled, theme, useTheme } from "./ui/theme.ts";
+import { theme, useTheme } from "./ui/theme.ts";
 import { createWorkspace } from "./workspace.ts";
 
 // the status line takes the last row
@@ -16,9 +17,8 @@ const STATUS_ROWS = 1;
 const RESUME_HEADER = "Resume this session with:";
 const OUTPUT_TAIL_CHARS = 64 * 1024;
 const EOF_GRACE_MS = 300;
-export const LIGHT_NOTICE = "tema pergaminho: use /theme light no claude  ×";
 
-/** The claude pane; on the light theme its first row asks once for claude's `/theme light`, gone on a click. */
+/** The claude pane: a rounded box around the embedded terminal claude runs in. */
 export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; terminal: EmbeddedTerminalRenderable } {
 	const box = new BoxRenderable(renderer, {
 		id: "claude-pane",
@@ -30,21 +30,6 @@ export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; t
 		backgroundColor: theme.bg,
 		title: formatTitle({ model: null, effort: null, state: null }),
 	});
-	const light = theme.name === "pergaminho";
-	if (light) {
-		const notice = new TextRenderable(renderer, {
-			id: "light-notice",
-			height: 1,
-			flexShrink: 0,
-			wrapMode: "none",
-			content: styled([{ text: LIGHT_NOTICE, fg: theme.dim, italic: true }]),
-		});
-		notice.onMouseDown = (event) => {
-			event.stopPropagation();
-			notice.visible = false;
-		};
-		box.add(notice);
-	}
 	const terminal = new EmbeddedTerminalRenderable(renderer, {
 		id: "claude-terminal",
 		width: "100%",
@@ -52,12 +37,12 @@ export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; t
 		flexShrink: 1,
 		minHeight: 0,
 		cols: Math.max(1, renderer.width - 2),
-		rows: Math.max(1, renderer.height - 2 - STATUS_ROWS - (light ? 1 : 0)),
+		rows: Math.max(1, renderer.height - 2 - STATUS_ROWS),
 		transparentBackground: true,
 	});
 	box.add(terminal);
 	// claude's default text (no color of its own) turns sepia on the light ground: OSC 10 sets the default foreground
-	if (light)
+	if (theme.name === "pergaminho")
 		terminal.write(`\x1b]10;rgb:${theme.fg.slice(1, 3)}/${theme.fg.slice(3, 5)}/${theme.fg.slice(5, 7)}\x1b\\`);
 	return { box, terminal };
 }
@@ -101,7 +86,8 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 	box.add(createSplash(renderer).node);
 	terminal.focus();
 
-	// claude's own settings stay untouched: sanzio's hooks ride on --settings, merged over the user's
+	// claude's own settings stay untouched: sanzio's hooks and theme ride on --settings, merged over the user's;
+	// the theme itself comes from sanzio's plugin, loaded for this run only with --plugin-dir
 	const token = crypto.randomUUID();
 	const hooks = startHookServer({ token, onEvent: (event) => workspace.hook(event) });
 	void workspace.start();
@@ -113,12 +99,14 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 		markEof = resolve;
 	});
 
-	const proc = Bun.spawn([launch.command, "--settings", JSON.stringify(hookSettings(hooks.url)), ...launch.args], {
+	const settings: ClaudeSettings = { ...hookSettings(hooks.url), theme: claudeThemeKey(theme.name) };
+	const argv = [launch.command, "--settings", JSON.stringify(settings), "--plugin-dir", PLUGIN_DIR, ...launch.args];
+	const proc = Bun.spawn(argv, {
 		cwd: launch.cwd,
 		env: { ...launch.env, [HOOK_TOKEN_ENV]: token },
 		terminal: {
 			cols: Math.max(1, renderer.width - 2),
-			rows: Math.max(1, renderer.height - 2 - STATUS_ROWS - (theme.name === "pergaminho" ? 1 : 0)),
+			rows: Math.max(1, renderer.height - 2 - STATUS_ROWS),
 			name: "xterm-256color",
 			data: (_pty, data) => {
 				terminal.write(data);

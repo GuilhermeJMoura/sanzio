@@ -1,0 +1,22 @@
+{
+	"name": "Sanzio pergaminho",
+	"base": "light",
+	"overrides": {
+		"claude": "#7a4f08",
+		"text": "#3b2a1a",
+		"inactive": "#5f4a30",
+		"subtle": "#7f6a40",
+		"permission": "#1f4a8f",
+		"promptBorder": "#1f4a8f",
+		"bashBorder": "#8f2112",
+		"success": "#3a561a",
+		"error": "#8f2112",
+		"warning": "#7a4f08",
+		"diffAdded": "#dde5b5",
+		"diffRemoved": "#f0cdbd",
+		"diffAddedWord": "#acba87",
+		"diffRemovedWord": "#d3998a",
+		"userMessageBackground": "#e3d3ab",
+		"selectionBg": "#c7d3ea"
+	}
+}
