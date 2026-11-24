@@ -17,11 +17,19 @@ Named after Raffaello Sanzio, whose workshop was the largest of the Renaissance:
 Requires [Bun](https://bun.sh) 1.3.5+ and [Claude Code](https://code.claude.com).
 
 ```sh
+npm i -g sanzio
+sanzio
+```
+
+Or with Bun: `bun add -g sanzio`.
+
+From source:
+
+```sh
 git clone https://github.com/GuilhermeJMoura/sanzio
 cd sanzio
 bun install
 bun link
-sanzio
 ```
 
 Every argument is passed to `claude` (`sanzio -c`, `sanzio --resume <id>`).
