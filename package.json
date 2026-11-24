@@ -3,9 +3,37 @@
 	"version": "0.1.0",
 	"description": "A terminal workspace that runs Claude Code inside an OpenTUI pane",
 	"license": "MIT",
+	"author": "GuilhermeJMoura",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/GuilhermeJMoura/sanzio.git"
+	},
+	"homepage": "https://github.com/GuilhermeJMoura/sanzio#readme",
+	"bugs": {
+		"url": "https://github.com/GuilhermeJMoura/sanzio/issues"
+	},
+	"keywords": [
+		"claude",
+		"claude-code",
+		"tui",
+		"terminal",
+		"agent",
+		"editor",
+		"opentui",
+		"bun"
+	],
 	"type": "module",
 	"bin": {
 		"sanzio": "src/cli.ts"
+	},
+	"files": [
+		"src",
+		"plugin",
+		"README.md",
+		"LICENSE"
+	],
+	"engines": {
+		"bun": ">=1.3.5"
 	},
 	"scripts": {
 		"start": "bun run src/cli.ts",
