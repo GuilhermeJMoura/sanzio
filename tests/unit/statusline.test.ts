@@ -25,7 +25,7 @@ const text = (model: StatusModel) => {
 describe("AC8 status line", () => {
 	test("SEGUINDO, branch, what claude does, +/− · files and the shortcuts", () => {
 		expect(text(base)).toBe(
-			" Sanzio  SEGUINDO  ⎇ feat/sessions  claude em src/x.ts  | +12 −3 · 4 arq  ctrl+e editor · f seguir ",
+			" Sanzio  SEGUINDO  ⎇ feat/sessions  claude em src/x.ts  | +12 −3 · 4 arq  ctrl+e editor · ctrl+o foco · f seguir ",
 		);
 		const mode = statusParts(base).left.find((s) => s.text === " SEGUINDO ");
 		expect(mode).toMatchObject({ bg: "#24407a", fg: "#fbf3dc", bold: true });
@@ -130,5 +130,38 @@ describe("AC4 / AC6 a narrow status line drops the right side first; the mark, t
 		const { l, r } = fitted({ ...base, workspaceVisible: false, invalidTheme: "perganinho", width: 140 });
 		expect(l).toContain(" SEGUINDO ");
 		expect(r).not.toContain("editor abre");
+	});
+});
+
+describe("foco-pelo-teclado AC6 ctrl+o foco beside ctrl+e editor", () => {
+	test("shown with the workspace, right after ctrl+e editor; not in conversation mode", () => {
+		expect(text(base)).toContain("ctrl+e editor · ctrl+o foco · f seguir");
+		const key = statusParts(base).right.find((s) => s.text === "ctrl+o");
+		expect(key).toMatchObject({ fg: "#dcab4a" });
+		expect(text({ ...base, workspaceVisible: false, width: 200 })).not.toContain("ctrl+o");
+	});
+
+	test("on a narrowing screen it goes after the edit keys and before f seguir and ctrl+e editor", () => {
+		const model = { ...base, editing: true, dirty: true, follow: "paused" as const };
+		const seen = (width: number) => {
+			const r = statusParts({ ...model, width })
+				.right.map((s) => s.text)
+				.join("");
+			return {
+				edit: r.includes("ctrl+s"),
+				focus: r.includes("ctrl+o foco"),
+				follow: r.includes("f seguir"),
+				editor: r.includes("ctrl+e editor"),
+			};
+		};
+		let dropped: string[] = [];
+		let last = seen(200);
+		expect(last).toEqual({ edit: true, focus: true, follow: true, editor: true });
+		for (let width = 199; width >= 40; width--) {
+			const now = seen(width);
+			for (const k of ["edit", "focus", "follow", "editor"] as const) if (last[k] && !now[k]) dropped = [...dropped, k];
+			last = now;
+		}
+		expect(dropped).toEqual(["edit", "focus", "follow", "editor"]);
 	});
 });
