@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SanzioRun, SanzioRunOptions } from "$types/testing.ts";
 import { HINT } from "../src/ui/splash-frame.ts";
+import { THEMES } from "../src/ui/theme.ts";
 import { startSanzio, tempDir } from "./helpers/pty.ts";
 
 let run: SanzioRun | undefined;
@@ -131,4 +132,21 @@ describe("AC5 / AC6 theme from the config file or SANZIO_THEME", () => {
 		expect(statusLine(screen)).toContain(' ⚠ tema "perganinho" inválido, usando "verniz" ');
 		expect(r.output()).toContain("48;2;42;37;25m");
 	});
+});
+
+describe("AC5 / AC6 the claude pane sits on the theme's ground, not the host terminal's", () => {
+	for (const t of Object.values(THEMES)) {
+		test(`${t.name}: claude's text and empty cells carry the ${t.bg} background`, async () => {
+			const { r } = await startWithSplash({ env: { SANZIO_THEME: t.name } });
+			await r.waitForScreen((s) => !s.includes(HINT) && s.includes("fake claude ready"), "claude visible");
+			await Bun.sleep(200);
+			const out = r.output();
+			const at = out.lastIndexOf("fake");
+			// the background set right before claude's text: the host default (49) would show the host's own color
+			const backgrounds = [...out.slice(Math.max(0, at - 200), at).matchAll(/.\[(49|48;2;[0-9;]+)m/g)];
+			const rgb = [1, 3, 5].map((i) => Number.parseInt(t.bg.slice(i, i + 2), 16)).join(";");
+			expect(backgrounds.at(-1)?.[1]).toBe(`48;2;${rgb}`);
+			expect(out.slice(at, at + 400)).not.toContain("\x1b[49m");
+		});
+	}
 });

@@ -18,6 +18,8 @@ const RESUME_HEADER = "Resume this session with:";
 const OUTPUT_TAIL_CHARS = 64 * 1024;
 const EOF_GRACE_MS = 300;
 
+const oscColor = (hex: string) => `rgb:${hex.slice(1, 3)}/${hex.slice(3, 5)}/${hex.slice(5, 7)}`;
+
 /** The claude pane: a rounded box around the embedded terminal claude runs in. */
 export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; terminal: EmbeddedTerminalRenderable } {
 	const box = new BoxRenderable(renderer, {
@@ -38,12 +40,12 @@ export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; t
 		minHeight: 0,
 		cols: Math.max(1, renderer.width - 2),
 		rows: Math.max(1, renderer.height - 2 - STATUS_ROWS),
-		transparentBackground: true,
+		transparentBackground: false,
 	});
 	box.add(terminal);
-	// claude's default text (no color of its own) turns sepia on the light ground: OSC 10 sets the default foreground
-	if (theme.name === "pergaminho")
-		terminal.write(`\x1b]10;rgb:${theme.fg.slice(1, 3)}/${theme.fg.slice(3, 5)}/${theme.fg.slice(5, 7)}\x1b\\`);
+	// claude's default colors are the theme's: OSC 10 / 11 set the default foreground and background, so empty cells
+	// and text with no color of its own sit on the pane's ground instead of the host terminal's
+	terminal.write(`\x1b]10;${oscColor(theme.fg)}\x1b\\\x1b]11;${oscColor(theme.bg)}\x1b\\`);
 	return { box, terminal };
 }
 
