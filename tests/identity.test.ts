@@ -85,8 +85,8 @@ describe("AC4 the status line starts with the Sanzio mark", () => {
 		const { r } = await startWithSplash();
 		const screen = await r.waitForScreen((s) => statusLine(s).includes("SEGUINDO"), "status line");
 		expect(statusLine(screen)).toStartWith(" Sanzio  SEGUINDO");
-		expect(r.output()).toMatch(/38;2;232;105;76m(\x1b\[[0-9;]*m)*S/);
-		expect(r.output()).toMatch(/38;2;220;171;74m(\x1b\[[0-9;]*m)*anzio/);
+		expect(r.output()).toMatch(/38;2;232;105;76m(.\[[0-9;]*m)*S/);
+		expect(r.output()).toMatch(/38;2;220;171;74m(.\[[0-9;]*m)*anzio/);
 	});
 });
 

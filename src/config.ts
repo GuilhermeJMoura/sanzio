@@ -7,7 +7,7 @@ export const DEFAULT_THEME: ThemeName = "verniz";
 const NAMES: readonly ThemeName[] = ["verniz", "pergaminho"];
 
 export function configPath(env: Record<string, string | undefined>): string {
-	return join(env["HOME"] || homedir(), ".config", "sanzio", "config.json");
+	return join(env.HOME || homedir(), ".config", "sanzio", "config.json");
 }
 
 /** The config file's text, or null when it cannot be read. */
@@ -43,7 +43,7 @@ export function selectTheme(sources: ThemeSources): ThemeSelection {
 }
 
 export function loadTheme(env: Record<string, string | undefined>): ThemeSelection {
-	return selectTheme({ env: env["SANZIO_THEME"], file: readConfigText(configPath(env)) });
+	return selectTheme({ env: env.SANZIO_THEME, file: readConfigText(configPath(env)) });
 }
 
 /** The one-line status warning for an invalid theme name; shorter on narrow screens. */
