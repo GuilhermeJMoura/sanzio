@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { PhdtermRun } from "$types/testing.ts";
+import type { SanzioRun } from "$types/testing.ts";
 import { startReady } from "./helpers/pty.ts";
 import { gitRepo } from "./helpers/repo.ts";
 
-let run: PhdtermRun | undefined;
+let run: SanzioRun | undefined;
 afterEach(() => run?.kill());
 
 const COLS = 140;
@@ -11,7 +11,7 @@ const ROWS = 36;
 const EXPLORER = 31; // paneSizes(140, 36)
 
 /** Clicks (1-based SGR) the first cell of `text` on screen, searching only the given column range. */
-async function click(r: PhdtermRun, text: string, fromCol = 0, toCol = COLS) {
+async function click(r: SanzioRun, text: string, fromCol = 0, toCol = COLS) {
 	// like a person, click a frame after it shows: hit-testing settles a moment after the paint reaches the host
 	await Bun.sleep(150);
 	const lines = (await r.screen()).split("\n");

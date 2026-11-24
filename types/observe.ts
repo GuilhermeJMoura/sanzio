@@ -28,7 +28,7 @@ export interface PatchHunk {
 
 export type HookPhase = "pre" | "post";
 
-/** What phdterm keeps from a PreToolUse / PostToolUse hook payload. */
+/** What sanzio keeps from a PreToolUse / PostToolUse hook payload. */
 export interface HookEvent {
 	phase: HookPhase;
 	tool: string;
@@ -54,7 +54,7 @@ export interface HookServer {
 export type GitMark = "M" | "U";
 
 export interface RepoInfo {
-	/** folder phdterm watches: the git root, or the current folder outside a repo */
+	/** folder sanzio watches: the git root, or the current folder outside a repo */
 	root: string;
 	isGit: boolean;
 }
@@ -70,7 +70,7 @@ export interface FileUpdate {
 	/** new content; null when the file is gone */
 	content: string | null;
 	byClaude: boolean;
-	/** the user saved it from phdterm's editor (ctrl+s) */
+	/** the user saved it from sanzio's editor (ctrl+s) */
 	byYou?: boolean;
 	tool: string;
 	/** new-file lines this edit added, when the hook said so (structuredPatch) */
@@ -106,7 +106,7 @@ export interface HookMatcherGroup {
 	hooks: HttpHookHandler[];
 }
 
-/** The slice of Claude Code settings phdterm passes with `--settings`. */
+/** The slice of Claude Code settings sanzio passes with `--settings`. */
 export interface HookSettings {
 	hooks: Record<"PreToolUse" | "PostToolUse" | "PostToolUseFailure", HookMatcherGroup[]>;
 }

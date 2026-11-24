@@ -9,8 +9,8 @@ const assistant = (model: string, effort: string, stop: string) =>
 	`${JSON.stringify({ type: "assistant", perTurnEffort: effort, message: { model, stop_reason: stop } })}\n`;
 
 function setup() {
-	const configDir = tempDir("phdterm-config-");
-	const cwd = tempDir("phdterm-cwd-");
+	const configDir = tempDir("sanzio-config-");
+	const cwd = tempDir("sanzio-cwd-");
 	const projects = join(configDir, "projects", projectSlug(cwd));
 	mkdirSync(projects, { recursive: true });
 	mkdirSync(join(configDir, "sessions"), { recursive: true });

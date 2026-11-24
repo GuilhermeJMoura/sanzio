@@ -7,7 +7,7 @@ export const git = (cwd: string, ...args: string[]) =>
 
 /** A committed repo on branch feat/sessions with an ignored dist/ and *.log, and a node_modules folder. */
 export function gitRepo(): string {
-	const root = tempDir("phdterm-repo-");
+	const root = tempDir("sanzio-repo-");
 	git(root, "init", "-q", "-b", "feat/sessions");
 	mkdirSync(join(root, "src"));
 	mkdirSync(join(root, "node_modules"));

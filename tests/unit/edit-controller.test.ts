@@ -25,7 +25,7 @@ function fakeSurface(): EditSurface & { type(text: string): void } {
 }
 
 function setup(files: Record<string, string | Uint8Array>) {
-	const root = tempDir("phdterm-edit-");
+	const root = tempDir("sanzio-edit-");
 	for (const [path, content] of Object.entries(files)) writeFileSync(join(root, path), content);
 	const surface = fakeSurface();
 	const edit = createEditController({
@@ -70,7 +70,7 @@ describe("fix: a failed save keeps my text, shows the error and never exits", ()
 		expect(readFileSync(join(root, "notes.txt"), "utf8")).toBe("MINE alpha\n");
 	});
 
-	test("claude exited: salvar failing keeps phdterm open on the prompt; a save that works lets it close", async () => {
+	test("claude exited: salvar failing keeps sanzio open on the prompt; a save that works lets it close", async () => {
 		const { root, surface, edit } = setup({ "notes.txt": "alpha\n" });
 		await edit.enter("notes.txt", 1);
 		surface.type("MINE alpha");

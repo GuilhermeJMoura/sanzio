@@ -2,7 +2,7 @@ import type { JsonObject } from "$types/json.ts";
 import type { HookEvent, HookServer, HookServerOptions, HookSettings, PatchHunk } from "$types/observe.ts";
 
 /** Claude Code reads the token from this env var into the hook header, so it never shows in argv. */
-export const HOOK_TOKEN_ENV = "PHDTERM_HOOK_TOKEN";
+export const HOOK_TOKEN_ENV = "SANZIO_HOOK_TOKEN";
 const MATCHER = "Edit|Write|MultiEdit|NotebookEdit|Bash";
 const TIMEOUT_S = 5;
 
@@ -20,7 +20,7 @@ function isHunk(value: unknown): value is PatchHunk {
 	);
 }
 
-/** Keeps what phdterm needs from a PreToolUse / PostToolUse payload; null for anything else. */
+/** Keeps what sanzio needs from a PreToolUse / PostToolUse payload; null for anything else. */
 export function parseHookPayload(payload: unknown): HookEvent | null {
 	if (!isObject(payload)) return null;
 	const name = payload.hook_event_name;

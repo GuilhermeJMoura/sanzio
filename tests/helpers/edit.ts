@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PhdtermRun } from "$types/testing.ts";
+import type { SanzioRun } from "$types/testing.ts";
 import { startReady } from "./pty.ts";
 import { git, gitRepo } from "./repo.ts";
 
@@ -21,8 +21,8 @@ export const KEY = {
 
 export const NOTES = ["alpha", "beta", "gamma", "delta"].join("\n");
 
-/** A repo with notes.txt (4 lines unless told), phdterm on it, the workspace shown and notes.txt open in the viewer. */
-export async function openNotes(notes = `${NOTES}\n`, cols = 120, rows = 34): Promise<PhdtermRun> {
+/** A repo with notes.txt (4 lines unless told), sanzio on it, the workspace shown and notes.txt open in the viewer. */
+export async function openNotes(notes = `${NOTES}\n`, cols = 120, rows = 34): Promise<SanzioRun> {
 	const root = gitRepo();
 	writeFileSync(join(root, "notes.txt"), notes);
 	git(root, "add", ".");
@@ -38,7 +38,7 @@ export async function openNotes(notes = `${NOTES}\n`, cols = 120, rows = 34): Pr
 }
 
 /** Focuses the editor (one click on its text) and presses i. */
-export async function startEditing(r: PhdtermRun): Promise<void> {
+export async function startEditing(r: SanzioRun): Promise<void> {
 	await r.click("gamma");
 	await Bun.sleep(100);
 	r.write("i");
@@ -46,7 +46,7 @@ export async function startEditing(r: PhdtermRun): Promise<void> {
 }
 
 /** Types `text` one key at a time, the way a person does. */
-export async function type(r: PhdtermRun, text: string): Promise<void> {
+export async function type(r: SanzioRun, text: string): Promise<void> {
 	for (const ch of text) {
 		r.write(ch);
 		await Bun.sleep(15);

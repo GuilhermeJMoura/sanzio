@@ -5,7 +5,7 @@ import { DRACULA } from "./theme.ts";
 
 const d = DRACULA;
 
-// home / end stay on the line, like any editor; undo, redo and page keys are phdterm's (its own history)
+// home / end stay on the line, like any editor; undo, redo and page keys are sanzio's (its own history)
 const KEY_BINDINGS = [
 	...defaultTextareaKeyBindings.filter(
 		(b) => !["home", "end"].includes(b.name) && !["undo", "redo", "submit"].includes(b.action),
@@ -14,7 +14,7 @@ const KEY_BINDINGS = [
 	{ name: "end", action: "line-end" as const },
 ];
 
-/** The whole file with a cursor, in the editor pane; phdterm feeds it text and reads it back. */
+/** The whole file with a cursor, in the editor pane; sanzio feeds it text and reads it back. */
 export function createEditSurface(
 	renderer: CliRenderer,
 	style: SyntaxStyle,

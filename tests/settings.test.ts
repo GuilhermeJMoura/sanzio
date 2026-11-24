@@ -1,17 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PhdtermRun } from "$types/testing.ts";
-import { startPhdterm } from "./helpers/pty.ts";
+import type { SanzioRun } from "$types/testing.ts";
+import { startSanzio } from "./helpers/pty.ts";
 import { gitRepo } from "./helpers/repo.ts";
 
-let run: PhdtermRun | undefined;
+let run: SanzioRun | undefined;
 afterEach(() => run?.kill());
 
 const listAll = (dir: string): string[] =>
 	existsSync(dir) ? readdirSync(dir, { recursive: true, encoding: "utf8" }).map(String).sort() : [];
 
-describe("AC7 phdterm's hooks go in through --settings; the user's settings and hooks are left alone", () => {
+describe("AC7 sanzio's hooks go in through --settings; the user's settings and hooks are left alone", () => {
 	test("settings.json is untouched, no settings file is written, and the user's own hook still runs", async () => {
 		const root = gitRepo();
 		const scratch = join(root, "..", `${root.split("/").pop()}-home`);
@@ -28,14 +28,14 @@ describe("AC7 phdterm's hooks go in through --settings; the user's settings and 
 		const mtime = statSync(settingsFile).mtimeMs;
 		const configBefore = listAll(configDir);
 
-		run = startPhdterm({ cwd: root, cols: 120, rows: 34, env: { CLAUDE_CONFIG_DIR: configDir } });
+		run = startSanzio({ cwd: root, cols: 120, rows: 34, env: { CLAUDE_CONFIG_DIR: configDir } });
 		const r = run;
 		await r.waitFor(() => r.records().some((x) => x.event === "start"), "fake claude start");
 		await Bun.sleep(200);
 		await r.claude({ op: "edit", file: "src/a.ts", old: "export const a = 1;", new: "export const a = 9;" });
 
-		// phdterm's http hook fired: the editor follows the edit
-		await r.waitForScreen((s) => s.includes("╭─ src/a.ts"), "phdterm followed the edit");
+		// sanzio's http hook fired: the editor follows the edit
+		await r.waitForScreen((s) => s.includes("╭─ src/a.ts"), "sanzio followed the edit");
 		// the user's command hook fired too, with claude's payload
 		const userHook = readFileSync(marker, "utf8");
 		expect(JSON.parse(userHook.trim().split("\n")[0] ?? "{}")).toMatchObject({

@@ -37,7 +37,7 @@ export interface EditSurface {
 	page(lines: number): void;
 }
 
-/** Why phdterm asks salvar / descartar / cancelar before it drops unsaved text. */
+/** Why sanzio asks salvar / descartar / cancelar before it drops unsaved text. */
 export type PromptReason = "switch" | "follow" | "leave" | "exit";
 
 export type PromptAction = "save" | "discard" | "cancel";

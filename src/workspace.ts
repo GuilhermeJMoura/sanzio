@@ -241,7 +241,7 @@ export function createWorkspace(
 
 	const timer = setInterval(render, TICK_MS);
 	renderer.on("resize", render);
-	// ctrl+e is phdterm's in every pane, claude's included (End still moves to the end of the line there);
+	// ctrl+e is sanzio's in every pane, claude's included (End still moves to the end of the line there);
 	// global key listeners run before the focused pane, so claude never sees it
 	const onGlobalKey = (key: KeyEvent) => {
 		if (!key.ctrl || key.meta || key.name !== "e") return;

@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PhdtermRun } from "$types/testing.ts";
+import type { SanzioRun } from "$types/testing.ts";
 import { projectSlug } from "../src/session-info.ts";
 import { startReady } from "./helpers/pty.ts";
 import { gitRepo, sedInPlace } from "./helpers/repo.ts";
 
-let run: PhdtermRun | undefined;
+let run: SanzioRun | undefined;
 afterEach(() => run?.kill());
 
 /** Runs a fake-claude tool call and returns how long the screen took to show it after the call returned. */
-async function shownWithin(r: PhdtermRun, act: () => Promise<void>, seen: (screen: string) => boolean, label: string) {
+async function shownWithin(r: SanzioRun, act: () => Promise<void>, seen: (screen: string) => boolean, label: string) {
 	await act();
 	const started = performance.now();
 	await r.waitForScreen(seen, label, 3000);
@@ -70,7 +70,7 @@ describe("AC2 the editor follows each edit in under a second, ◂ claude on the 
 	});
 });
 
-describe("focus: f and ctrl+e belong to phdterm only outside the claude pane", () => {
+describe("focus: f and ctrl+e belong to sanzio only outside the claude pane", () => {
 	test("with claude focused, f goes to claude; after a click on the explorer it pauses follow instead", async () => {
 		run = await start();
 		const r = run;

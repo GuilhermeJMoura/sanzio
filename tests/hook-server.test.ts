@@ -23,7 +23,7 @@ const post = (url: string, body: unknown, token = "s3cret") =>
 		body: JSON.stringify(body),
 	});
 
-describe("AC2 hook events reach phdterm", () => {
+describe("AC2 hook events reach sanzio", () => {
 	test("listens on 127.0.0.1 on a random port", () => {
 		const { url } = start();
 		expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/hook$/);

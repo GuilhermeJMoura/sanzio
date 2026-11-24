@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { EmbeddedTerminalRenderable } from "@opentui/core";
 import { createTestRenderer } from "@opentui/core/testing";
-import type { FakeClaudeOp, FakeClaudeRecord, PhdtermRun, PhdtermRunOptions } from "$types/testing.ts";
+import type { FakeClaudeOp, FakeClaudeRecord, SanzioRun, SanzioRunOptions } from "$types/testing.ts";
 
 export const CLI = resolve(import.meta.dir, "../../src/cli.ts");
 export const FAKE_BIN = resolve(import.meta.dir, "../fixtures/bin");
@@ -14,8 +14,8 @@ export function tempDir(prefix: string): string {
 	return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
 }
 
-export function startPhdterm(options: PhdtermRunOptions): PhdtermRun {
-	const scratch = tempDir("phdterm-run-");
+export function startSanzio(options: SanzioRunOptions): SanzioRun {
+	const scratch = tempDir("sanzio-run-");
 	const logFile = join(scratch, "fake-claude.jsonl");
 	const configDir = join(scratch, "claude-config");
 	const controlFile = join(scratch, "fake-claude-control.jsonl");
@@ -169,8 +169,8 @@ export function startPhdterm(options: PhdtermRunOptions): PhdtermRun {
 	};
 }
 
-export async function startReady(options: PhdtermRunOptions): Promise<PhdtermRun> {
-	const run = startPhdterm(options);
+export async function startReady(options: SanzioRunOptions): Promise<SanzioRun> {
+	const run = startSanzio(options);
 	await run.waitFor(
 		() => run.output().includes("ready") && run.records().some((r) => r.event === "start"),
 		"fake claude to paint",

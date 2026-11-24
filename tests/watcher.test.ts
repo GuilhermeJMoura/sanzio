@@ -12,7 +12,7 @@ describe("watcher scope: the git root, minus .git, node_modules and gitignored f
 	test("repoInfo finds the git root from a subfolder; outside git it is the folder itself", () => {
 		const root = gitRepo();
 		expect(repoInfo(join(root, "src"))).toEqual({ root, isGit: true });
-		const plain = tempDir("phdterm-plain-");
+		const plain = tempDir("sanzio-plain-");
 		expect(repoInfo(plain)).toEqual({ root: plain, isGit: false });
 		expect(gitBranch(plain)).toBeNull();
 		expect(gitBranch(root)).toBe("feat/sessions");
@@ -28,7 +28,7 @@ describe("watcher scope: the git root, minus .git, node_modules and gitignored f
 	});
 
 	test("outside git it lists the folder without .git and node_modules", async () => {
-		const root = tempDir("phdterm-plain-");
+		const root = tempDir("sanzio-plain-");
 		mkdirSync(join(root, "node_modules"));
 		writeFileSync(join(root, "node_modules/x.js"), "x");
 		writeFileSync(join(root, "notes.md"), "n");

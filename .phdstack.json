@@ -11,8 +11,8 @@
 		{
 			"when": "src/",
 			"app": "Maestri",
-			"window": "phdterm",
-			"start": "bun link && phdterm"
+			"window": "sanzio",
+			"start": "bun link && sanzio"
 		}
 	]
 }

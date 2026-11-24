@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "phdterm",
+      "name": "sanzio",
       "dependencies": {
         "@opentui/core": "^0.9.8",
       },

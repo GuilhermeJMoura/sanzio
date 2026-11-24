@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { PhdtermRun } from "$types/testing.ts";
+import type { SanzioRun } from "$types/testing.ts";
 import { startReady, tempDir } from "./helpers/pty.ts";
 
-let run: PhdtermRun | undefined;
+let run: SanzioRun | undefined;
 afterEach(() => run?.kill());
 
-describe("AC7 phdterm exits with claude's code and a clean terminal", () => {
+describe("AC7 sanzio exits with claude's code and a clean terminal", () => {
 	test("same exit code and every mode turned off after the last frame", async () => {
-		run = await startReady({ cwd: tempDir("phdterm-exit-"), env: { FAKE_CLAUDE_EXIT: "3" } });
+		run = await startReady({ cwd: tempDir("sanzio-exit-"), env: { FAKE_CLAUDE_EXIT: "3" } });
 		run.write("/exit");
 		expect(await run.exited).toBe(3);
 
@@ -28,7 +28,7 @@ describe("AC7 phdterm exits with claude's code and a clean terminal", () => {
 	});
 
 	test("a host with the kitty keyboard protocol gets its keyboard mode popped", async () => {
-		run = await startReady({ cwd: tempDir("phdterm-exit-"), kittyHost: true });
+		run = await startReady({ cwd: tempDir("sanzio-exit-"), kittyHost: true });
 		run.write("/exit");
 		expect(await run.exited).toBe(0);
 		const out = run.output();

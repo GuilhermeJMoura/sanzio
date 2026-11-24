@@ -43,7 +43,7 @@ export class SessionChanges {
 		if (update.byYou) {
 			this.yours.set(update.path, {
 				path: update.path,
-				tool: "phdterm",
+				tool: "sanzio",
 				at: update.at,
 				isNew: this.base.get(update.path) === null,
 				stats: this.statsOf(update.path),

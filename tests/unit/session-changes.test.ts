@@ -79,7 +79,7 @@ describe("AC2 the lines of the last edit get ◂ claude", () => {
 describe("AC2 a ctrl+s save is the user's change, not claude's", () => {
 	test("listed under yourEdits with +/−, left out of claude's list and totals", () => {
 		const s = session();
-		s.apply({ path: "src/b.ts", content: "B\nmore\n", byClaude: false, byYou: true, tool: "phdterm", at: 1000 });
+		s.apply({ path: "src/b.ts", content: "B\nmore\n", byClaude: false, byYou: true, tool: "sanzio", at: 1000 });
 		expect(s.yourEdits()).toMatchObject([{ path: "src/b.ts", stats: { added: 2, removed: 1 } }]);
 		expect(s.claudeEdits()).toEqual([]);
 		expect(s.totals()).toEqual({ added: 0, removed: 0, files: 0 });

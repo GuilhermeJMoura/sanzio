@@ -130,7 +130,7 @@ const ops = {
 			writeFileSync(resolve(file), content);
 			return { filePath: resolve(file), type: "create" };
 		}),
-	// what claude reads is what is on disk right now: no cache between phdterm's save and claude
+	// what claude reads is what is on disk right now: no cache between sanzio's save and claude
 	read: ({ file }) =>
 		toolCall("Read", { file_path: resolve(file) }, () => {
 			const content = readFileSync(resolve(file), "utf8");

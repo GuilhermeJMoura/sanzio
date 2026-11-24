@@ -104,8 +104,8 @@ export function createEditController(deps: {
 		current.raw = raw;
 		current.doc = parseDoc(raw);
 		conflict = null;
-		deps.changes.apply({ path, content: raw, byClaude: false, byYou: true, tool: "phdterm", at: deps.now() });
-		// claude already left: once nothing is unsaved, phdterm can close
+		deps.changes.apply({ path, content: raw, byClaude: false, byYou: true, tool: "sanzio", at: deps.now() });
+		// claude already left: once nothing is unsaved, sanzio can close
 		if (exitWaiter) stop();
 		else deps.render();
 		return true;
@@ -123,7 +123,7 @@ export function createEditController(deps: {
 			afterPrompt = null;
 			return deps.render();
 		}
-		// a save that did not happen keeps the prompt (and phdterm) open on my text
+		// a save that did not happen keeps the prompt (and sanzio) open on my text
 		if (action === "save" && !(await save())) return;
 		const then = afterPrompt;
 		stop();

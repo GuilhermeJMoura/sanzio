@@ -24,7 +24,7 @@ export type FakeClaudeOp =
 	| { op: "read"; file: string }
 	| { op: "edit-interrupted"; file: string };
 
-export interface PhdtermRunOptions {
+export interface SanzioRunOptions {
 	args?: string[];
 	cwd: string;
 	env?: Record<string, string | undefined>;
@@ -36,7 +36,7 @@ export interface PhdtermRunOptions {
 	path?: string;
 }
 
-export interface PhdtermRun {
+export interface SanzioRun {
 	cwd: string;
 	logFile: string;
 	configDir: string;

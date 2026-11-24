@@ -3,7 +3,7 @@ import { runClaudePane } from "./claude-pane.ts";
 
 const command = Bun.which("claude");
 if (!command) {
-	process.stderr.write("phdterm: claude was not found in PATH. Install Claude Code and try again.\n");
+	process.stderr.write("sanzio: claude was not found in PATH. Install Claude Code and try again.\n");
 	process.exit(127);
 }
 

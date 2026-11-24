@@ -39,7 +39,7 @@ export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; t
 	return { box, terminal };
 }
 
-/** Finds claude's exit hint in its raw output and returns it with `phdterm` as the program, or null. */
+/** Finds claude's exit hint in its raw output and returns it with `sanzio` as the program, or null. */
 export function rewriteResumeHint(output: string): string | null {
 	const text = Bun.stripANSI(output).replace(/\r\n?/g, "\n");
 	const at = text.lastIndexOf(RESUME_HEADER);
@@ -50,7 +50,7 @@ export function rewriteResumeHint(output: string): string | null {
 		.map((line) => line.trim())
 		.find((line) => line.length > 0);
 	if (!command || !/(^|[\s;&|])claude(?=\s|$)/.test(command)) return null;
-	return `${RESUME_HEADER}\n${command.replace(/(^|[\s;&|])claude(?=\s|$)/, "$1phdterm")}\n`;
+	return `${RESUME_HEADER}\n${command.replace(/(^|[\s;&|])claude(?=\s|$)/, "$1sanzio")}\n`;
 }
 
 function exitCodeOf(proc: Bun.Subprocess): number {
@@ -60,7 +60,7 @@ function exitCodeOf(proc: Bun.Subprocess): number {
 	return signalCode ? 128 + constants.signals[signalCode] : 1;
 }
 
-/** Runs claude inside the phdterm workspace and resolves with claude's exit code once the terminal is restored. */
+/** Runs claude inside the sanzio workspace and resolves with claude's exit code once the terminal is restored. */
 export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 	const startedAt = Date.now();
 	const renderer = await createCliRenderer({
@@ -75,7 +75,7 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 	renderer.root.add(workspace.root);
 	terminal.focus();
 
-	// claude's own settings stay untouched: phdterm's hooks ride on --settings, merged over the user's
+	// claude's own settings stay untouched: sanzio's hooks ride on --settings, merged over the user's
 	const token = crypto.randomUUID();
 	const hooks = startHookServer({ token, onEvent: (event) => workspace.hook(event) });
 	void workspace.start();

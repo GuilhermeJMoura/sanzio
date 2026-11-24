@@ -1,11 +1,11 @@
 {
-	"name": "phdterm",
+	"name": "sanzio",
 	"version": "0.1.0",
 	"description": "A terminal workspace that runs Claude Code inside an OpenTUI pane",
 	"license": "MIT",
 	"type": "module",
 	"bin": {
-		"phdterm": "src/cli.ts"
+		"sanzio": "src/cli.ts"
 	},
 	"scripts": {
 		"start": "bun run src/cli.ts",

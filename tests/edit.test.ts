@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PhdtermRun } from "$types/testing.ts";
+import type { SanzioRun } from "$types/testing.ts";
 import { KEY, NOTES, openNotes, startEditing, type } from "./helpers/edit.ts";
 
-let run: PhdtermRun | undefined;
+let run: SanzioRun | undefined;
 afterEach(() => run?.kill());
 
-const disk = (r: PhdtermRun, file = "notes.txt") => readFileSync(join(r.cwd, file), "utf8");
+const disk = (r: SanzioRun, file = "notes.txt") => readFileSync(join(r.cwd, file), "utf8");
 /** The editor line numbered `n` reads `text` (line number gutter, then the text). */
 const line = (n: number, text: string) => new RegExp(`│\\s+${n}\\s+${text}\\s`);
 
@@ -158,7 +158,7 @@ describe("AC5 claude writes the file I am editing with unsaved changes", () => {
 	});
 });
 
-describe("AC6 unsaved text: phdterm asks salvar / descartar / cancelar before losing it", () => {
+describe("AC6 unsaved text: sanzio asks salvar / descartar / cancelar before losing it", () => {
 	test("switching file asks; cancel keeps mine, descartar drops it and opens the other file", async () => {
 		run = await openNotes();
 		const r = run;
@@ -191,7 +191,7 @@ describe("AC6 unsaved text: phdterm asks salvar / descartar / cancelar before lo
 		expect(disk(r)).toBe(`MINE ${NOTES}\n`);
 	});
 
-	test("claude exits with unsaved text: phdterm asks, salvar writes it, then phdterm exits", async () => {
+	test("claude exits with unsaved text: sanzio asks, salvar writes it, then sanzio exits", async () => {
 		run = await openNotes();
 		const r = run;
 		await startEditing(r);
@@ -302,7 +302,7 @@ describe("fix: follow never moves the editor away from unsaved text", () => {
 	});
 });
 
-describe("fix: a failed ctrl+s shows the error and phdterm keeps running", () => {
+describe("fix: a failed ctrl+s shows the error and sanzio keeps running", () => {
 	test("read-only file: the error banner shows, my text stays, a save after chmod works", async () => {
 		run = await openNotes();
 		const r = run;
