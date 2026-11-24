@@ -10,12 +10,12 @@
 		"promptBorder": "#86aaee",
 		"bashBorder": "#e8694c",
 		"success": "#b0cd78",
-		"error": "#f4907a",
+		"error": "#f69a84",
 		"warning": "#e3ad66",
 		"diffAdded": "#34401f",
 		"diffRemoved": "#4b2318",
 		"diffAddedWord": "#596a3a",
-		"diffRemovedWord": "#7e4435",
+		"diffRemovedWord": "#7e4738",
 		"userMessageBackground": "#3a3120",
 		"selectionBg": "#24407a"
 	}

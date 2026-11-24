@@ -26,7 +26,7 @@ describe("AC2 the viewer: +/− lines colored, ◂ claude on the last edit", () 
 			[5, 7],
 		]);
 		expect([...v.hideLineNumbers]).toEqual([0, 6]);
-		expect(v.signs.get(2)).toEqual({ after: " −", afterColor: "#f4907a" });
+		expect(v.signs.get(2)).toEqual({ after: " −", afterColor: "#f69a84" });
 		expect(v.signs.get(3)?.after).toBe(" +");
 		expect(v.colors.get(2)?.content).toBe("#4b2318");
 		expect(v.colors.get(4)?.content).toBe("#34401f");

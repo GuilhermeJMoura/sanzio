@@ -21,7 +21,7 @@ export const VERNIZ: Theme = {
 	lapis: "#86aaee",
 	add: "#b0cd78",
 	addBg: "#34401f",
-	del: "#f4907a",
+	del: "#f69a84",
 	delBg: "#4b2318",
 	mod: "#e3ad66",
 	syntax: {
