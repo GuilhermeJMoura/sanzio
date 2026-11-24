@@ -40,9 +40,22 @@ export interface StatusModel {
 	dirty: boolean;
 	/** the configured theme name when it is not a theme (verniz is used instead), else null */
 	invalidTheme: string | null;
-	/** screen columns: a narrow screen gets the short theme warning */
+	/** screen columns: the line is fitted to them, dropping what may go */
 	width: number;
 }
+
+/** What the status line may leave out or shorten on a narrow screen. */
+export type StatusOptional =
+	| "longHint"
+	| "hint"
+	| "longWarning"
+	| "files"
+	| "editKeys"
+	| "follow"
+	| "editor"
+	| "counts"
+	| "activity"
+	| "branch";
 
 /** A run of styled text in a terminal cell row. */
 export interface Segment {

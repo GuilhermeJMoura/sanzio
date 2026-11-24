@@ -105,6 +105,14 @@ describe("AC4 the status line starts with the Sanzio mark", () => {
 	});
 });
 
+describe("AC4 / AC6 a narrow window keeps the mark, the warning and the mode whole", () => {
+	test("56 columns with an invalid theme: Sanzio, the short warning and SEGUINDO", async () => {
+		const { r } = await startWithSplash({ cols: 56, env: { SANZIO_THEME: "perganinho" } });
+		const screen = await r.waitForScreen((s) => statusLine(s).includes("SEGUINDO"), "status line");
+		expect(statusLine(screen)).toStartWith(" Sanzio  ⚠ tema inválido: verniz   SEGUINDO");
+	});
+});
+
 describe("AC5 / AC6 theme from the config file or SANZIO_THEME", () => {
 	test("no configuration paints verniz", async () => {
 		const { r } = await startWithSplash({ env: { HOME: tempDir("sanzio-home-") } });
@@ -127,7 +135,7 @@ describe("AC5 / AC6 theme from the config file or SANZIO_THEME", () => {
 	});
 
 	test("an invalid name falls back to verniz with a one-line warning", async () => {
-		const { r } = await startWithSplash({ cols: 120, env: { SANZIO_THEME: "perganinho" } });
+		const { r } = await startWithSplash({ cols: 160, env: { SANZIO_THEME: "perganinho" } });
 		const screen = await r.waitForScreen((s) => statusLine(s).includes("⚠"), "warning");
 		expect(statusLine(screen)).toContain(' ⚠ tema "perganinho" inválido, usando "verniz" ');
 		expect(r.output()).toContain("48;2;42;37;25m");

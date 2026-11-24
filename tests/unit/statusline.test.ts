@@ -45,10 +45,12 @@ describe("AC8 status line", () => {
 	});
 
 	test("conversation mode explains when the editor opens; a manual hide says so", () => {
-		expect(text({ ...base, workspaceVisible: false })).toContain(
+		expect(text({ ...base, workspaceVisible: false, width: 200 })).toContain(
 			"modo conversa · editor abre na 1ª edição · ctrl+e editor · f seguir",
 		);
-		expect(text({ ...base, workspaceVisible: false, manual: false })).toContain("editor escondido · ctrl+e");
+		expect(text({ ...base, workspaceVisible: false, manual: false, width: 200 })).toContain(
+			"editor escondido · ctrl+e",
+		);
 	});
 });
 
@@ -58,7 +60,7 @@ describe("AC1 editing: EDITANDO on the status line, with its keys", () => {
 		expect(text({ ...base, follow: "paused", editing: true, dirty: true })).toStartWith(
 			" Sanzio  EDITANDO ●  PAUSADO ",
 		);
-		expect(text({ ...base, editing: true })).toContain("| ctrl+s salvar · esc sair · +12");
+		expect(text({ ...base, editing: true, width: 200 })).toContain("| ctrl+s salvar · esc sair · +12");
 	});
 });
 
@@ -73,7 +75,7 @@ describe("AC4 the fixed Sanzio mark on the left of the status line", () => {
 
 describe("AC6 an invalid theme name: one vermilion warning segment", () => {
 	test("full on wide screens, short on narrow ones, after the mark", () => {
-		const wide = statusParts({ ...base, invalidTheme: "perganinho" }).left;
+		const wide = statusParts({ ...base, invalidTheme: "perganinho", width: 160 }).left;
 		expect(wide[4]).toMatchObject({ text: ' ⚠ tema "perganinho" inválido, usando "verniz" ', bg: "#b3321f" });
 		expect(text({ ...base, invalidTheme: "x", width: 60 })).toStartWith(" Sanzio  ⚠ tema inválido: verniz   SEGUINDO ");
 		expect(text(base)).not.toContain("⚠");
@@ -82,10 +84,51 @@ describe("AC6 an invalid theme name: one vermilion warning segment", () => {
 
 describe("AC6 the warning is never cut", () => {
 	test("in conversation mode the hint gives way to the warning", () => {
-		const conv = { ...base, workspaceVisible: false, invalidTheme: "perganinho", width: 120 };
+		const conv = { ...base, workspaceVisible: false, invalidTheme: "perganinho", width: 160 };
 		expect(text(conv)).toContain('⚠ tema "perganinho" inválido, usando "verniz"');
-		expect(text(conv)).not.toContain("modo conversa");
+		expect(text(conv)).not.toContain("editor abre");
 		expect(text({ ...conv, width: 200 })).toContain("modo conversa");
 		expect(text({ ...conv, width: 90 })).toContain("⚠ tema inválido: verniz");
+	});
+});
+
+describe("AC4 / AC6 a narrow status line drops the right side first; the mark, the mode and the warning stay whole", () => {
+	const fitted = (model: StatusModel) => {
+		const { left, right } = statusParts(model);
+		const l = left.map((s) => s.text).join("");
+		const r = right.map((s) => s.text).join("");
+		return { l, r, total: [...l].length + [...r].length };
+	};
+	const models: [string, StatusModel][] = [
+		["following", base],
+		["editing", { ...base, editing: true, dirty: true, follow: "paused" }],
+		["conversation", { ...base, workspaceVisible: false }],
+		["invalid theme", { ...base, invalidTheme: "perganinho" }],
+		["invalid theme in conversation", { ...base, workspaceVisible: false, invalidTheme: "perganinho" }],
+	];
+	for (const [name, model] of models) {
+		test(`${name}: fits from 56 to 200 columns`, () => {
+			for (let width = 56; width <= 200; width++) {
+				const { l, r, total } = fitted({ ...model, width });
+				expect({ width, total: Math.min(total, width) }).toEqual({ width, total });
+				expect(l).toStartWith(" Sanzio ");
+				expect(l).toContain(model.follow === "paused" ? " PAUSADO " : " SEGUINDO ");
+				if (model.editing) expect(l).toContain(" EDITANDO ● ");
+				if (model.invalidTheme) expect(l).toMatch(/ ⚠ tema (inválido: verniz|"perganinho" inválido, usando "verniz") /);
+				expect(r === "" || r.endsWith(" ")).toBe(true);
+			}
+		});
+	}
+
+	test("56 columns: counts and hints go, the left side is whole", () => {
+		const { l, r } = fitted({ ...base, width: 56 });
+		expect(l).toStartWith(" Sanzio  SEGUINDO ");
+		expect(r.length).toBeLessThan(56 - l.length + 1);
+	});
+
+	test("140 columns with an invalid theme in conversation: the hint goes, SEGUINDO stays whole", () => {
+		const { l, r } = fitted({ ...base, workspaceVisible: false, invalidTheme: "perganinho", width: 140 });
+		expect(l).toContain(" SEGUINDO ");
+		expect(r).not.toContain("editor abre");
 	});
 });
