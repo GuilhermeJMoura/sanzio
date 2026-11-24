@@ -31,7 +31,10 @@ class SplashRenderable extends Renderable {
 	}
 }
 
-/** The opening, laid over the inside of the claude pane; it leaves on the first key (which still reaches claude) or after SPLASH_MS. */
+/**
+ * The opening, laid over the inside of the claude pane; it leaves on the first key or paste, which it swallows,
+ * or after SPLASH_MS. Nothing typed blind may reach claude: it could answer a prompt hidden under the splash.
+ */
 export function createSplash(renderer: CliRenderer, durationMs = SPLASH_MS) {
 	const node = new SplashRenderable(renderer, {
 		id: "splash",
@@ -43,16 +46,21 @@ export function createSplash(renderer: CliRenderer, durationMs = SPLASH_MS) {
 		zIndex: 100,
 	});
 	let timer: ReturnType<typeof setTimeout> | null = null;
-	// no preventDefault: the key goes on to the focused claude terminal
-	const onKey = () => close();
+	// global listeners run before the focused terminal's: preventDefault keeps the key away from claude
+	const onKey = (event: { preventDefault(): void }) => {
+		event.preventDefault();
+		close();
+	};
 	const close = () => {
 		if (timer) clearTimeout(timer);
 		timer = null;
 		renderer.keyInput.off("keypress", onKey);
+		renderer.keyInput.off("paste", onKey);
 		if (!node.isDestroyed) node.destroy();
 		renderer.requestRender();
 	};
 	renderer.keyInput.on("keypress", onKey);
+	renderer.keyInput.on("paste", onKey);
 	timer = setTimeout(close, durationMs);
-	return { node, close };
+	return { node, close, isOpen: () => !node.isDestroyed };
 }

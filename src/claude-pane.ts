@@ -47,6 +47,11 @@ export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; t
 	return { box, terminal };
 }
 
+const TRUST_DIALOG = /trust (the files in )?this folder|do you trust|one you trust/i;
+
+/** True when claude's output shows its folder-trust dialog. */
+export const showsTrustDialog = (output: string): boolean => TRUST_DIALOG.test(Bun.stripANSI(output));
+
 /** Finds claude's exit hint in its raw output and returns it with `sanzio` as the program, or null. */
 export function rewriteResumeHint(output: string): string | null {
 	const text = Bun.stripANSI(output).replace(/\r\n?/g, "\n");
@@ -83,7 +88,8 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 	const { box, terminal } = pane;
 	const workspace = createWorkspace(renderer, repoInfo(launch.cwd), pane, selection.invalid);
 	renderer.root.add(workspace.root);
-	box.add(createSplash(renderer).node);
+	const splash = createSplash(renderer);
+	box.add(splash.node);
 	terminal.focus();
 
 	// claude's own settings stay untouched: sanzio's hooks and theme ride on --settings, merged over the user's;
@@ -111,6 +117,8 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 			data: (_pty, data) => {
 				terminal.write(data);
 				tail = (tail + decoder.decode(data, { stream: true })).slice(-OUTPUT_TAIL_CHARS);
+				// claude asks whether to trust the folder: the dialog must be seen, never hidden under the splash
+				if (splash.isOpen() && showsTrustDialog(tail)) splash.close();
 			},
 			exit: () => markEof(),
 		},

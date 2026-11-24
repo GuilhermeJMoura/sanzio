@@ -46,12 +46,15 @@ describe("AC1 sanzio opens on Raphael's portrait and the big Sanzio", () => {
 	});
 });
 
-describe("AC2 the opening leaves on a key, and the key reaches claude", () => {
-	test("the first key closes it and is not swallowed", async () => {
+describe("AC2 the opening leaves on a key, and that key is swallowed", () => {
+	test("the key that closes it never reaches claude; the next one does", async () => {
 		const { r } = await startWithSplash();
-		r.write("x");
-		await r.waitFor(() => r.inputs().includes("x"), "x reaches claude");
+		r.write("1");
 		await r.waitForScreen((s) => !s.includes(HINT), "opening gone");
+		await Bun.sleep(300);
+		expect(r.inputs()).toBe("");
+		r.write("x");
+		await r.waitFor(() => r.inputs() === "x", "x reaches claude");
 	});
 
 	test("with no key it leaves by itself after about 1.5 s", async () => {
@@ -59,6 +62,18 @@ describe("AC2 the opening leaves on a key, and the key reaches claude", () => {
 		const shown = Date.now();
 		await r.waitForScreen((s) => !s.includes(HINT) && s.includes("ready"), "opening gone", 4000);
 		expect(Date.now() - shown).toBeLessThan(3000);
+		expect(r.inputs()).toBe("");
+	});
+
+	test("claude's folder-trust dialog closes it at once, with nothing sent", async () => {
+		// the dialog can close the splash before it is ever drawn, so time it from claude's start, not the splash
+		const r = startSanzio({ cwd: tempDir("sanzio-id-"), cols: 100, rows: 30, env: { FAKE_CLAUDE_TRUST: "1" } });
+		run = r;
+		await r.waitFor(() => r.records().some((rec) => rec.event === "start"), "fake claude started");
+		const shown = Date.now();
+		const screen = await r.waitForScreen((s) => !s.includes(HINT) && s.includes("Do you trust"), "trust dialog shown");
+		expect(Date.now() - shown).toBeLessThan(1000);
+		expect(screen).toContain("Yes, proceed");
 		expect(r.inputs()).toBe("");
 	});
 });
