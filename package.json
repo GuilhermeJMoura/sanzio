@@ -1,0 +1,24 @@
+{
+	"name": "sanzio",
+	"version": "0.1.0",
+	"description": "A terminal workspace that runs Claude Code inside an OpenTUI pane",
+	"license": "MIT",
+	"type": "module",
+	"bin": {
+		"sanzio": "src/cli.ts"
+	},
+	"scripts": {
+		"start": "bun run src/cli.ts",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@opentui/core": "^0.9.8"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.6.8",
+		"@types/bun": "^1.4.5",
+		"typescript": "^7.0.2"
+	}
+}

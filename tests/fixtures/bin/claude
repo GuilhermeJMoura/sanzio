@@ -1,0 +1,164 @@
+#!/usr/bin/env bun
+// Stand-in for Claude Code used by the PTY tests: records what it receives and behaves like claude on exit.
+import { spawnSync } from "node:child_process";
+import { appendFileSync, existsSync, readFileSync, writeFileSync, writeSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+const logFile = process.env.FAKE_CLAUDE_LOG ?? "/dev/null";
+const record = (entry) => appendFileSync(logFile, `${JSON.stringify(entry)}\n`);
+const pick = (prefixes) =>
+	Object.fromEntries(Object.entries(process.env).filter(([k]) => prefixes.some((p) => k === p || k.startsWith(p))));
+
+record({
+	event: "start",
+	argv: process.argv.slice(2),
+	cwd: process.cwd(),
+	env: pick(["MAESTRI_", "PATH", "TERM", "COLORTERM"]),
+	cols: process.stdout.columns,
+	rows: process.stdout.rows,
+});
+
+const kitty = process.env.FAKE_CLAUDE_KEYBOARD !== "legacy";
+process.stdin.setRawMode(true);
+process.stdout.write(`\x1b[?1049h${kitty ? "\x1b[>1u" : "\x1b[>4;2m"}\x1b[?2004h\x1b[?1000h\x1b[?1006h`);
+// FAKE_CLAUDE_TRUST: open on Claude Code's folder-trust dialog, whose default answer is Yes
+if (process.env.FAKE_CLAUDE_TRUST) process.stdout.write("Do you trust the files in this folder?\r\n❯ 1. Yes, proceed\r\n  2. No, exit\r\n");
+process.stdout.write("fake claude ready\r\n");
+process.stdout.write("\x1b[38;2;80;250;123mContext 42%\x1b[0m\r\n");
+
+process.stdout.on("resize", () => record({ event: "resize", cols: process.stdout.columns, rows: process.stdout.rows }));
+
+let typed = "";
+process.stdin.on("data", (chunk) => {
+	const bytes = Buffer.from(chunk);
+	record({ event: "input", hex: bytes.toString("hex") });
+	typed += bytes.toString("latin1");
+	if (typed.includes("/exit")) quit();
+});
+
+function quit() {
+	writeSync(1, `${kitty ? "\x1b[<u" : "\x1b[>4m"}\x1b[?2004l\x1b[?1000l\x1b[?1006l\x1b[?1049l`);
+	const id = process.env.FAKE_CLAUDE_SESSION ?? "00000000-0000-0000-0000-000000000000";
+	writeSync(1, `\x1b[2m\nResume this session with:\nclaude --resume ${id}\n\x1b[22m`);
+	process.exit(Number(process.env.FAKE_CLAUDE_EXIT ?? "0"));
+}
+
+// --- tool calls with hooks: the test appends ops to FAKE_CLAUDE_CONTROL, we run them like claude would ---
+
+const argv = process.argv.slice(2);
+const readJson = (text) => {
+	try {
+		return JSON.parse(text);
+	} catch {
+		return null;
+	}
+};
+// like claude: the user's settings file, then --settings (inline JSON or a path) on top; hook lists merge
+function settingsSources() {
+	const sources = [];
+	const userFile = join(process.env.CLAUDE_CONFIG_DIR ?? `${process.env.HOME}/.claude`, "settings.json");
+	if (existsSync(userFile)) sources.push(readJson(readFileSync(userFile, "utf8")));
+	const at = argv.indexOf("--settings");
+	if (at >= 0) {
+		const value = argv[at + 1] ?? "";
+		sources.push(value.trim().startsWith("{") ? readJson(value) : readJson(readFileSync(value, "utf8")));
+	}
+	return sources.filter(Boolean);
+}
+
+const interpolate = (value, allowed) =>
+	value.replace(/\$\{?(\w+)\}?/g, (_, name) => (allowed.includes(name) ? (process.env[name] ?? "") : ""));
+
+async function runHooks(name, payload) {
+	for (const settings of settingsSources()) {
+		for (const group of settings.hooks?.[name] ?? []) {
+			const matcher = group.matcher ?? "";
+			if (matcher && matcher !== "*" && !new RegExp(`^(?:${matcher})$`).test(payload.tool_name)) continue;
+			for (const hook of group.hooks ?? []) {
+				if (hook.type === "http") {
+					const allowed = hook.allowedEnvVars ?? [];
+					const headers = Object.fromEntries(
+						Object.entries(hook.headers ?? {}).map(([k, v]) => [k, interpolate(String(v), allowed)]),
+					);
+					await fetch(hook.url, {
+						method: "POST",
+						headers: { "content-type": "application/json", ...headers },
+						body: JSON.stringify(payload),
+					}).catch(() => {});
+				} else if (hook.type === "command") {
+					spawnSync("sh", ["-c", hook.command], { input: JSON.stringify(payload), cwd: process.cwd() });
+				}
+			}
+		}
+	}
+	record({ event: "hook", name, tool: payload.tool_name });
+}
+
+let toolUses = 0;
+async function toolCall(tool, input, run) {
+	const base = { session_id: "fake", cwd: process.cwd(), tool_name: tool, tool_input: input, tool_use_id: `toolu_${++toolUses}` };
+	await runHooks("PreToolUse", { ...base, hook_event_name: "PreToolUse" });
+	const response = run();
+	await runHooks("PostToolUse", { ...base, hook_event_name: "PostToolUse", tool_response: response });
+}
+
+function edit({ file, old, new: replacement }) {
+	const path = resolve(file);
+	return toolCall("Edit", { file_path: path, old_string: old, new_string: replacement }, () => {
+		const before = readFileSync(path, "utf8");
+		const at = before.indexOf(old);
+		const start = before.slice(0, at).split("\n").length;
+		writeFileSync(path, before.replace(old, replacement));
+		const lines = [...old.split("\n").map((l) => `-${l}`), ...replacement.split("\n").map((l) => `+${l}`)];
+		const hunk = { oldStart: start, oldLines: old.split("\n").length, newStart: start, newLines: replacement.split("\n").length, lines };
+		return { filePath: path, oldString: old, newString: replacement, structuredPatch: [hunk] };
+	});
+}
+
+const ops = {
+	// a call that never finishes: denied permission or esc, so claude sends no PostToolUse
+	"edit-interrupted": ({ file }) =>
+		runHooks("PreToolUse", {
+			session_id: "fake",
+			cwd: process.cwd(),
+			hook_event_name: "PreToolUse",
+			tool_name: "Edit",
+			tool_input: { file_path: resolve(file), old_string: "x", new_string: "y" },
+			tool_use_id: `toolu_${++toolUses}`,
+		}),
+	edit,
+	write: ({ file, content }) =>
+		toolCall("Write", { file_path: resolve(file), content }, () => {
+			writeFileSync(resolve(file), content);
+			return { filePath: resolve(file), type: "create" };
+		}),
+	// what claude reads is what is on disk right now: no cache between sanzio's save and claude
+	read: ({ file }) =>
+		toolCall("Read", { file_path: resolve(file) }, () => {
+			const content = readFileSync(resolve(file), "utf8");
+			record({ event: "read", file, content });
+			return { type: "text", file: { filePath: resolve(file), content } };
+		}),
+	bash: ({ command }) =>
+		toolCall("Bash", { command }, () => {
+			const out = spawnSync("sh", ["-c", command], { cwd: process.cwd(), encoding: "utf8" });
+			return { stdout: out.stdout, stderr: out.stderr, interrupted: false };
+		}),
+};
+
+const controlFile = process.env.FAKE_CLAUDE_CONTROL;
+let handled = 0;
+let busy = false;
+if (controlFile) {
+	setInterval(async () => {
+		if (busy || !existsSync(controlFile)) return;
+		busy = true;
+		const lines = readFileSync(controlFile, "utf8").split("\n").filter(Boolean);
+		for (; handled < lines.length; handled++) {
+			const op = JSON.parse(lines[handled]);
+			await ops[op.op](op);
+			record({ event: "done", id: op.id });
+		}
+		busy = false;
+	}, 20);
+}
