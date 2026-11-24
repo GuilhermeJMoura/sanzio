@@ -35,7 +35,7 @@ export function claudeTheme(t: Theme): ClaudeThemeFile {
 			inactive: t.dim,
 			subtle: t.border,
 			permission: t.lapis,
-			promptBorder: t.lapis,
+			promptBorder: t.border,
 			bashBorder: t.status.markInitial,
 			success: t.add,
 			error: t.del,

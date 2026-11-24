@@ -7,7 +7,7 @@
 		"inactive": "#bcae8c",
 		"subtle": "#85774f",
 		"permission": "#86aaee",
-		"promptBorder": "#86aaee",
+		"promptBorder": "#85774f",
 		"bashBorder": "#e8694c",
 		"success": "#b0cd78",
 		"error": "#f69a84",

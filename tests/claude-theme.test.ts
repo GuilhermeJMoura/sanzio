@@ -56,6 +56,15 @@ describe("AC8 sanzio ships a Claude Code plugin with its two themes", () => {
 			expect(overrides.claude).toBe(THEMES[name].gold);
 			expect(overrides.text).toBe(THEMES[name].fg);
 		});
+
+		test(`${name}: the lines around claude's input are sanzio's muted pane border, not lapis`, () => {
+			const { overrides } = claudeTheme(THEMES[name]);
+			expect(overrides.promptBorder).toBe(THEMES[name].border);
+			expect(overrides.promptBorder).not.toBe(THEMES[name].lapis);
+			expect(overrides.bashBorder).not.toBe(THEMES[name].lapis);
+			// permission dialogs keep their lapis accent
+			expect(overrides.permission).toBe(THEMES[name].lapis);
+		});
 	}
 });
 
