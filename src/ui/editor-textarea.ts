@@ -1,9 +1,9 @@
 import type { CliRenderer, KeyEvent, SyntaxStyle } from "@opentui/core";
 import { defaultTextareaKeyBindings, LineNumberRenderable, TextareaRenderable } from "@opentui/core";
 import type { EditSnapshot } from "$types/edit.ts";
-import { DRACULA } from "./theme.ts";
+import { theme } from "./theme.ts";
 
-const d = DRACULA;
+const d = theme;
 
 // home / end stay on the line, like any editor; undo, redo and page keys are sanzio's (its own history)
 const KEY_BINDINGS = [

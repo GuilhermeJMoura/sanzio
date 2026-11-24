@@ -1,11 +1,14 @@
 import { writeSync } from "node:fs";
 import { constants } from "node:os";
-import { BoxRenderable, type CliRenderer, createCliRenderer, EmbeddedTerminalRenderable } from "@opentui/core";
+import type { CliRenderer } from "@opentui/core";
+import { BoxRenderable, createCliRenderer, EmbeddedTerminalRenderable, TextRenderable } from "@opentui/core";
 import type { ClaudeLaunch } from "$types/pane.ts";
+import { loadTheme } from "./config.ts";
 import { HOOK_TOKEN_ENV, hookSettings, startHookServer } from "./observe/hook-server.ts";
 import { repoInfo } from "./observe/watcher.ts";
 import { formatTitle, watchSession } from "./session-info.ts";
-import { DRACULA } from "./ui/theme.ts";
+import { createSplash } from "./ui/splash.ts";
+import { styled, theme, useTheme } from "./ui/theme.ts";
 import { createWorkspace } from "./workspace.ts";
 
 // the status line takes the last row
@@ -13,18 +16,35 @@ const STATUS_ROWS = 1;
 const RESUME_HEADER = "Resume this session with:";
 const OUTPUT_TAIL_CHARS = 64 * 1024;
 const EOF_GRACE_MS = 300;
+export const LIGHT_NOTICE = "tema pergaminho: use /theme light no claude  ×";
 
+/** The claude pane; on the light theme its first row asks once for claude's `/theme light`, gone on a click. */
 export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; terminal: EmbeddedTerminalRenderable } {
 	const box = new BoxRenderable(renderer, {
 		id: "claude-pane",
 		width: "100%",
 		height: "100%",
 		borderStyle: "rounded",
-		borderColor: DRACULA.accent,
-		titleColor: DRACULA.accent,
-		backgroundColor: DRACULA.bg,
+		borderColor: theme.accent,
+		titleColor: theme.accent,
+		backgroundColor: theme.bg,
 		title: formatTitle({ model: null, effort: null, state: null }),
 	});
+	const light = theme.name === "pergaminho";
+	if (light) {
+		const notice = new TextRenderable(renderer, {
+			id: "light-notice",
+			height: 1,
+			flexShrink: 0,
+			wrapMode: "none",
+			content: styled([{ text: LIGHT_NOTICE, fg: theme.dim, italic: true }]),
+		});
+		notice.onMouseDown = (event) => {
+			event.stopPropagation();
+			notice.visible = false;
+		};
+		box.add(notice);
+	}
 	const terminal = new EmbeddedTerminalRenderable(renderer, {
 		id: "claude-terminal",
 		width: "100%",
@@ -32,10 +52,13 @@ export function createClaudePane(renderer: CliRenderer): { box: BoxRenderable; t
 		flexShrink: 1,
 		minHeight: 0,
 		cols: Math.max(1, renderer.width - 2),
-		rows: Math.max(1, renderer.height - 2 - STATUS_ROWS),
+		rows: Math.max(1, renderer.height - 2 - STATUS_ROWS - (light ? 1 : 0)),
 		transparentBackground: true,
 	});
 	box.add(terminal);
+	// claude's default text (no color of its own) turns sepia on the light ground: OSC 10 sets the default foreground
+	if (light)
+		terminal.write(`\x1b]10;rgb:${theme.fg.slice(1, 3)}/${theme.fg.slice(3, 5)}/${theme.fg.slice(5, 7)}\x1b\\`);
 	return { box, terminal };
 }
 
@@ -63,16 +86,19 @@ function exitCodeOf(proc: Bun.Subprocess): number {
 /** Runs claude inside the sanzio workspace and resolves with claude's exit code once the terminal is restored. */
 export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 	const startedAt = Date.now();
+	const selection = loadTheme(launch.env);
+	useTheme(selection.name);
 	const renderer = await createCliRenderer({
 		screenMode: "alternate-screen",
 		exitOnCtrlC: false,
 		useMouse: true,
-		backgroundColor: DRACULA.bg,
+		backgroundColor: theme.bg,
 	});
 	const pane = createClaudePane(renderer);
 	const { box, terminal } = pane;
-	const workspace = createWorkspace(renderer, repoInfo(launch.cwd), pane);
+	const workspace = createWorkspace(renderer, repoInfo(launch.cwd), pane, selection.invalid);
 	renderer.root.add(workspace.root);
+	box.add(createSplash(renderer).node);
 	terminal.focus();
 
 	// claude's own settings stay untouched: sanzio's hooks ride on --settings, merged over the user's
@@ -92,7 +118,7 @@ export async function runClaudePane(launch: ClaudeLaunch): Promise<number> {
 		env: { ...launch.env, [HOOK_TOKEN_ENV]: token },
 		terminal: {
 			cols: Math.max(1, renderer.width - 2),
-			rows: Math.max(1, renderer.height - 2 - STATUS_ROWS),
+			rows: Math.max(1, renderer.height - 2 - STATUS_ROWS - (theme.name === "pergaminho" ? 1 : 0)),
 			name: "xterm-256color",
 			data: (_pty, data) => {
 				terminal.write(data);

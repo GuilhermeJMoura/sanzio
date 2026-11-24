@@ -3,7 +3,7 @@ import type { WorkspaceHandlers, WorkspaceViewModel } from "$types/workspace.ts"
 import { createEditor } from "./editor.ts";
 import { createExplorer } from "./explorer.ts";
 import { createStatusLine } from "./statusline.ts";
-import { DRACULA } from "./theme.ts";
+import { theme } from "./theme.ts";
 
 /** Explorer left, editor center, claude at the bottom, status line under it; claude alone in conversation mode. */
 export function createWorkspaceView(
@@ -16,7 +16,7 @@ export function createWorkspaceView(
 		width: "100%",
 		height: "100%",
 		flexDirection: "column",
-		backgroundColor: DRACULA.bg,
+		backgroundColor: theme.bg,
 	});
 	const work = new BoxRenderable(renderer, { id: "work", width: "100%", flexGrow: 1, flexDirection: "row" });
 	const right = new BoxRenderable(renderer, { id: "work-right", flexGrow: 1, height: "100%", flexDirection: "column" });
@@ -66,8 +66,8 @@ export function createWorkspaceView(
 			explorer.box.width = vm.sizes.explorerWidth;
 			claude.box.flexGrow = vm.visible ? 0 : 1;
 			claude.box.height = vm.visible ? vm.sizes.claudeHeight : "auto";
-			claude.box.borderColor = vm.focus === "claude" ? DRACULA.accent : DRACULA.line2;
-			claude.box.titleColor = vm.focus === "claude" ? DRACULA.accent : DRACULA.strong;
+			claude.box.borderColor = vm.focus === "claude" ? theme.accent : theme.border;
+			claude.box.titleColor = vm.focus === "claude" ? theme.accent : theme.strong;
 			if (vm.visible) {
 				explorer.update(vm.explorer);
 				editor.update(vm.editor);

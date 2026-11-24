@@ -1,9 +1,9 @@
 import type { ViewerMode } from "$types/edit.ts";
 import type { DiffOp, DiffRow } from "$types/observe.ts";
 import type { DiffView, SplitView } from "$types/workspace.ts";
-import { CLAUDE_MARK, DRACULA } from "./theme.ts";
+import { CLAUDE_MARK, theme } from "./theme.ts";
 
-const d = DRACULA;
+const d = theme;
 const MODES: ViewerMode[] = ["diff", "marked", "split"];
 
 /** `v` in the viewer: diff → arquivo marcado → lado a lado → diff. */
@@ -60,7 +60,7 @@ export function diffView(
 			const isJust = side !== "old" && row.kind === "add" && row.newNo !== null && just.has(row.newNo);
 			if (row.kind === "add") {
 				view.signs.set(i, { after: " +", afterColor: isJust ? d.accent : d.add });
-				view.colors.set(i, { gutter: isJust ? d.accentBg : d.addBg, content: d.addBg });
+				view.colors.set(i, { gutter: isJust ? d.glow : d.addBg, content: d.addBg });
 			} else if (row.kind === "del") {
 				view.signs.set(i, { after: " −", afterColor: d.del });
 				view.colors.set(i, { gutter: d.delBg, content: d.delBg });

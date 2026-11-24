@@ -38,6 +38,10 @@ export interface StatusModel {
 	manual: boolean | null;
 	editing: boolean;
 	dirty: boolean;
+	/** the configured theme name when it is not a theme (verniz is used instead), else null */
+	invalidTheme: string | null;
+	/** screen columns: a narrow screen gets the short theme warning */
+	width: number;
 }
 
 /** A run of styled text in a terminal cell row. */

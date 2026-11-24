@@ -35,6 +35,7 @@ export function createWorkspace(
 	renderer: CliRenderer,
 	repo: RepoInfo,
 	claude: { box: BoxRenderable; terminal: EmbeddedTerminalRenderable },
+	invalidTheme: string | null = null,
 	now: () => number = Date.now,
 ) {
 	const changes = new SessionChanges();
@@ -121,6 +122,8 @@ export function createWorkspace(
 				manual: state.manual,
 				editing: edit.active,
 				dirty: edit.dirty,
+				invalidTheme,
+				width: renderer.width,
 			},
 		};
 	};

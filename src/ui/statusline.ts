@@ -1,29 +1,16 @@
 import { BoxRenderable, type CliRenderer, TextRenderable } from "@opentui/core";
 import type { Segment, StatusModel, StatusParts } from "$types/workspace.ts";
-import { DRACULA, styled } from "./theme.ts";
+import { themeWarning } from "../config.ts";
+import { markSegments } from "./logo.ts";
+import { styled, theme } from "./theme.ts";
 
-const d = DRACULA;
+const d = theme;
+// below this width the theme warning takes its short form
+const NARROW_COLS = 80;
 
-export function statusParts(m: StatusModel): StatusParts {
-	const left: Segment[] = [];
-	if (m.editing) left.push({ text: m.dirty ? " EDITANDO ● " : " EDITANDO ", fg: d.bg, bg: d.mod, bold: true });
-	left.push(
-		m.follow === "following"
-			? { text: " SEGUINDO ", fg: d.bg, bg: d.accent, bold: true }
-			: { text: " PAUSADO ", fg: d.fg, bg: d.line2, bold: true },
-	);
-	if (m.branch) left.push({ text: ` ⎇ ${m.branch} `, fg: d.fg, bg: d.line2 });
-	if (m.busy && m.current) {
-		left.push({ text: " claude em ", fg: d.dim }, { text: `${m.current} `, fg: d.fg });
-	} else {
-		left.push({ text: m.busy ? " claude pensando… " : " claude ocioso ", fg: d.dim });
-	}
+const width = (segments: Segment[]) => segments.reduce((n, s) => n + [...s.text].length, 0);
 
-	const hint = m.workspaceVisible
-		? ""
-		: m.manual === false
-			? "editor escondido · "
-			: "modo conversa · editor abre na 1ª edição · ";
+function rightParts(m: StatusModel, hint: string): Segment[] {
 	const editKeys: Segment[] = m.editing
 		? [
 				{ text: "ctrl+s", fg: d.accent },
@@ -32,7 +19,7 @@ export function statusParts(m: StatusModel): StatusParts {
 				{ text: " sair · ", fg: d.faint },
 			]
 		: [];
-	const right: Segment[] = [
+	return [
 		...editKeys,
 		{ text: `+${m.added}`, fg: d.add },
 		{ text: " ", fg: d.dim },
@@ -43,7 +30,38 @@ export function statusParts(m: StatusModel): StatusParts {
 		{ text: "f", fg: d.accent },
 		{ text: " seguir ", fg: d.faint },
 	];
-	return { left, right };
+}
+
+export function statusParts(m: StatusModel): StatusParts {
+	const st = d.status;
+	const mark: Segment[] = [{ text: " " }, ...markSegments(), { text: " " }];
+	const left: Segment[] = [...mark];
+	let hint = m.workspaceVisible
+		? ""
+		: m.manual === false
+			? "editor escondido · "
+			: "modo conversa · editor abre na 1ª edição · ";
+	if (m.invalidTheme !== null) {
+		// the warning is never cut: the conversation hint gives way first, then the long form
+		let text = themeWarning(m.invalidTheme, m.width < NARROW_COLS);
+		const room = (warning: string) => width(mark) + warning.length + 1 + width(rightParts(m, hint)) <= m.width;
+		if (!room(text)) hint = "";
+		if (!room(text)) text = themeWarning(m.invalidTheme, true);
+		left.push({ text, fg: st.warnFg, bg: st.warnBg, bold: true }, { text: " " });
+	}
+	if (m.editing) left.push({ text: m.dirty ? " EDITANDO ● " : " EDITANDO ", fg: d.bg, bg: d.mod, bold: true });
+	left.push(
+		m.follow === "following"
+			? { text: " SEGUINDO ", fg: st.modeFg, bg: st.modeBg, bold: true }
+			: { text: " PAUSADO ", fg: d.fg, bg: d.raised, bold: true },
+	);
+	if (m.branch) left.push({ text: ` ⎇ ${m.branch} `, fg: st.branchFg, bg: st.branchBg });
+	if (m.busy && m.current) {
+		left.push({ text: " claude em ", fg: d.dim }, { text: `${m.current} `, fg: d.fg });
+	} else {
+		left.push({ text: m.busy ? " claude pensando… " : " claude ocioso ", fg: d.dim });
+	}
+	return { left, right: rightParts(m, hint) };
 }
 
 /** The status line; its "ctrl+e editor" and "f seguir" hints are clickable, the way back when only claude has focus. */

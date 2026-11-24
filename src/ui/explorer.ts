@@ -1,8 +1,8 @@
 import { BoxRenderable, type CliRenderer, TextRenderable } from "@opentui/core";
 import type { ChangedRow, ExplorerItem, ExplorerLine, ExplorerModel, Segment } from "$types/workspace.ts";
-import { DRACULA, fileIcon, styled } from "./theme.ts";
+import { fileIcon, styled, theme } from "./theme.ts";
 
-const d = DRACULA;
+const d = theme;
 
 export function explorerItems(m: ExplorerModel): ExplorerItem[] {
 	return [
@@ -42,7 +42,7 @@ export function explorerLines(m: ExplorerModel, cols: number): ExplorerLine[] {
 		const index = item++;
 		const open = path === m.open;
 		const cursor = m.focused && index === m.cursor;
-		const bg = open ? d.line2 : cursor ? d.line : undefined;
+		const bg = open ? d.sel : cursor ? d.raised : undefined;
 		const bar: Segment = { text: open ? "▎" : " ", fg: d.accent };
 		return { item: index, segments: fit([bar, ...left], right, cols, bg) };
 	};
@@ -109,7 +109,7 @@ export function createExplorer(
 		height: "100%",
 		flexShrink: 0,
 		borderStyle: "rounded",
-		borderColor: d.line2,
+		borderColor: d.border,
 		focusedBorderColor: d.accent,
 		backgroundColor: d.bg,
 		title: " explorer ",

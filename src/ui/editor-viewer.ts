@@ -5,9 +5,9 @@ import type { DiffOp, DiffRow } from "$types/observe.ts";
 import type { DiffView } from "$types/workspace.ts";
 import { contextRows } from "../observe/diff.ts";
 import { diffView, splitView } from "./diff-view.ts";
-import { DRACULA } from "./theme.ts";
+import { theme } from "./theme.ts";
 
-const d = DRACULA;
+const d = theme;
 const JUST_TOP_MARGIN = 3;
 const DOUBLE_CLICK_MS = 400;
 

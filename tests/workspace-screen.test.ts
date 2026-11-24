@@ -64,14 +64,14 @@ describe("AC4 opening another file pauses follow; f resumes on the last edit", (
 		const r = run;
 		await click(r, "config.json", 0, EXPLORER);
 		let s = await r.waitForScreen(
-			(x) => editorTitle("config.json")(x) && statusLine(x).startsWith(" PAUSADO "),
+			(x) => editorTitle("config.json")(x) && statusLine(x).startsWith(" Sanzio  PAUSADO "),
 			"config.json open, paused",
 		);
 		expect(lineWith(s, "╭─ config.json")).toContain("◌ seguir pausado · f");
 
 		r.write("f");
 		s = await r.waitForScreen(
-			(x) => editorTitle("src/a.ts")(x) && statusLine(x).startsWith(" SEGUINDO "),
+			(x) => editorTitle("src/a.ts")(x) && statusLine(x).startsWith(" Sanzio  SEGUINDO "),
 			"back on src/a.ts, following",
 		);
 		expect(lineWith(s, "╭─ src/a.ts")).toContain("● seguindo o claude");
@@ -82,7 +82,10 @@ describe("AC4 opening another file pauses follow; f resumes on the last edit", (
 		const r = run;
 		await click(r, "claude editou", 0, EXPLORER);
 		r.write("\x1b[B\x1b[B\x1b[B\x1b[B\r"); // past a.ts in "claude editou", src/, .gitignore, onto config.json
-		await r.waitForScreen((x) => editorTitle("config.json")(x) && statusLine(x).startsWith(" PAUSADO "), "paused");
+		await r.waitForScreen(
+			(x) => editorTitle("config.json")(x) && statusLine(x).startsWith(" Sanzio  PAUSADO "),
+			"paused",
+		);
 	});
 });
 
@@ -133,7 +136,7 @@ describe("AC8 status line", () => {
 		const r = await startReady({ cwd: gitRepo(), cols: COLS, rows: ROWS });
 		run = r;
 		expect(statusLine(await r.waitForScreen((s) => s.includes("SEGUINDO"), "status"))).toMatch(
-			/^ SEGUINDO {2}⎇ feat\/sessions {2}claude ocioso .* \+0 −0 · 0 arq {2}modo conversa · editor abre na 1ª edição · ctrl\+e editor · f seguir\s*$/,
+			/^ Sanzio {2}SEGUINDO {2}⎇ feat\/sessions {2}claude ocioso .* \+0 −0 · 0 arq {2}modo conversa · editor abre na 1ª edição · ctrl\+e editor · f seguir\s*$/,
 		);
 		await Bun.sleep(200);
 		await r.claude({ op: "edit", file: "src/a.ts", old: "export const a = 1;", new: "export const a = 2;\n// two" });
@@ -142,7 +145,7 @@ describe("AC8 status line", () => {
 			"claude em",
 		);
 		expect(statusLine(s)).toMatch(
-			/^ SEGUINDO {2}⎇ feat\/sessions {2}claude em src\/a\.ts .* \+2 −1 · 1 arq {2}ctrl\+e editor · f seguir\s*$/,
+			/^ Sanzio {2}SEGUINDO {2}⎇ feat\/sessions {2}claude em src\/a\.ts .* \+2 −1 · 1 arq {2}ctrl\+e editor · f seguir\s*$/,
 		);
 	});
 });

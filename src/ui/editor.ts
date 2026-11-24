@@ -5,9 +5,9 @@ import type { EditorModel, Segment } from "$types/workspace.ts";
 import { createBanner } from "./banner.ts";
 import { createEditSurface } from "./editor-textarea.ts";
 import { createViewer } from "./editor-viewer.ts";
-import { createSyntaxStyle, DRACULA, fileIcon, styled } from "./theme.ts";
+import { createSyntaxStyle, fileIcon, styled, theme } from "./theme.ts";
 
-const d = DRACULA;
+const d = theme;
 const VIEWER_LABELS = { diff: "diff", marked: "arquivo", split: "lado a lado" } as const;
 
 function followLabel(model: EditorModel): Segment[] {
@@ -79,7 +79,7 @@ export function createEditor(
 		width: "100%",
 		flexGrow: 1,
 		borderStyle: "rounded",
-		borderColor: d.line2,
+		borderColor: d.border,
 		focusedBorderColor: d.accent,
 		backgroundColor: d.bg,
 		title: " editor ",
@@ -183,7 +183,7 @@ export function createEditor(
 			box.title = title(model);
 			box.titleColor = model.focused ? d.accent : d.strong;
 			// the edit surface holds the focus while editing, not the box: paint the border from the model
-			box.borderColor = model.focused ? d.accent : d.line2;
+			box.borderColor = model.focused ? d.accent : d.border;
 			follow.content = styled(followLabel(model));
 			const strip = tabs(model);
 			tabRanges = strip.ranges;

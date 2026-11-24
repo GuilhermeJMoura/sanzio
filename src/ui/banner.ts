@@ -1,8 +1,8 @@
 import { BoxRenderable, type CliRenderer, TextRenderable } from "@opentui/core";
 import type { Segment } from "$types/workspace.ts";
-import { DRACULA, styled } from "./theme.ts";
+import { styled, theme } from "./theme.ts";
 
-const d = DRACULA;
+const d = theme;
 
 /** A one-row notice in the editor with clickable buttons on the right; the first button is the primary one. */
 export function createBanner(renderer: CliRenderer, id: string, buttons: { label: string; onClick: () => void }[]) {
@@ -12,7 +12,7 @@ export function createBanner(renderer: CliRenderer, id: string, buttons: { label
 		height: 1,
 		flexShrink: 0,
 		flexDirection: "row",
-		backgroundColor: d.accentBg,
+		backgroundColor: d.glow,
 		visible: false,
 	});
 	const text = new TextRenderable(renderer, { flexGrow: 1, flexShrink: 1, wrapMode: "none" });
@@ -34,7 +34,7 @@ export function createBanner(renderer: CliRenderer, id: string, buttons: { label
 			node.content = styled(
 				i === 0
 					? [{ text: ` ${label} `, fg: d.bg, bg: d.accent, bold: true }]
-					: [{ text: " " }, { text: ` ${label} `, fg: d.dim, bg: d.line2 }],
+					: [{ text: " " }, { text: ` ${label} `, fg: d.dim, bg: d.raised }],
 			);
 		});
 	};
