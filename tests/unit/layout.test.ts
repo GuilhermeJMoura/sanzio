@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	claudeEdited,
+	cycleFocus,
 	dismissPending,
 	focusPane,
 	initialWorkspace,
@@ -87,5 +88,25 @@ describe("AC6 ctrl+e hides and shows explorer and editor; the manual choice wins
 		s = toggleWorkspace(s);
 		expect(s.focus).toBe("claude");
 		expect(focusPane(s, "explorer").focus).toBe("claude");
+	});
+});
+
+describe("foco-pelo-teclado AC1 / AC3 ctrl+o cycles the focus claude → explorer → editor → claude", () => {
+	test("with the workspace shown each ctrl+o moves to the next pane, then back to claude", () => {
+		let s = toggleWorkspace(initialWorkspace());
+		expect(s.focus).toBe("claude");
+		s = cycleFocus(s);
+		expect(s.focus).toBe("explorer");
+		s = cycleFocus(s);
+		expect(s.focus).toBe("editor");
+		s = cycleFocus(s);
+		expect(s.focus).toBe("claude");
+	});
+
+	test("in conversation mode ctrl+o changes nothing", () => {
+		const s = initialWorkspace();
+		expect(cycleFocus(s)).toEqual(s);
+		const hidden = toggleWorkspace(claudeEdited(s, "a"));
+		expect(cycleFocus(hidden)).toEqual(hidden);
 	});
 });

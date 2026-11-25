@@ -74,3 +74,92 @@ describe("following an edit scrolls to the latest edit's first changed line", ()
 		expect(setup.captureCharFrame()).toMatch(/250 \+ const line250 = 'second try';\s+◂ claude/);
 	});
 });
+
+describe("AC5 the sideways scroll goes back to column 0 on another file, another mode or a new claude edit", () => {
+	const long = `HEAD ${"x".repeat(200)}`;
+	const before = ["const a = 1;", long, "const c = 3;"];
+	const after = ["const a = 2;", long, "const c = 3;"];
+
+	async function scrolled() {
+		setup = await createTestRenderer({ width: 80, height: 20 });
+		const editor = createEditor(setup.renderer, { onFocus: noop, onOpenPending: noop, onDismiss: noop, onTab: noop });
+		setup.renderer.root.add(editor.box);
+		const settle = async () => {
+			for (let i = 0; i < 6; i++) {
+				await setup?.renderOnce();
+				await Bun.sleep(20);
+			}
+		};
+		editor.update(model("src/a.ts", before, after, [1]));
+		await settle();
+		editor.scrollSideways(40);
+		await settle();
+		expect(setup.captureCharFrame()).not.toContain("HEAD");
+		return { editor, settle, frame: () => setup?.captureCharFrame() ?? "" };
+	}
+
+	test("another file", async () => {
+		const { editor, settle, frame } = await scrolled();
+		editor.update(model("src/b.ts", before, after, [1]));
+		await settle();
+		expect(frame()).toContain("HEAD");
+	});
+
+	test("another mode (v)", async () => {
+		const { editor, settle, frame } = await scrolled();
+		editor.update({ ...model("src/a.ts", before, after, [1]), viewer: "split" });
+		await settle();
+		expect(frame()).toContain("HEAD");
+	});
+
+	test("a new claude edit", async () => {
+		const { editor, settle, frame } = await scrolled();
+		editor.update(model("src/a.ts", before, ["const a = 3;", long, "const c = 3;"], [1]));
+		await settle();
+		expect(frame()).toContain("HEAD");
+	});
+
+	test("only the age or the gutter changing keeps the column", async () => {
+		const { editor, settle, frame } = await scrolled();
+		editor.update({ ...model("src/a.ts", before, after, []), justLines: [] });
+		await settle();
+		expect(frame()).not.toContain("HEAD");
+	});
+});
+
+describe("AC4 side by side with a longer new half: one shared column, up to the longer half's end", () => {
+	const before = ["const a = 1;", "short"];
+	const after = ["const a = 1;", `short ${"x".repeat(150)}TAILEND`];
+
+	async function split() {
+		setup = await createTestRenderer({ width: 80, height: 20 });
+		const editor = createEditor(setup.renderer, { onFocus: noop, onOpenPending: noop, onDismiss: noop, onTab: noop });
+		setup.renderer.root.add(editor.box);
+		editor.update({ ...model("src/a.ts", before, after, [2]), viewer: "split" });
+		const settle = async () => {
+			for (let i = 0; i < 6; i++) {
+				await setup?.renderOnce();
+				await Bun.sleep(20);
+			}
+		};
+		await settle();
+		return { editor, settle, frame: () => setup?.captureCharFrame() ?? "" };
+	}
+
+	test("→ reaches the end of the new half's long line", async () => {
+		const { editor, settle, frame } = await split();
+		for (let i = 0; i < 60; i++) editor.scrollSideways(4);
+		await settle();
+		expect(frame()).toContain("TAILEND");
+	});
+
+	test("the wheel over the narrower old half drives the shared column too", async () => {
+		const { settle, frame } = await split();
+		const row = frame()
+			.split("\n")
+			.findIndex((line) => line.includes("short"));
+		for (let i = 0; i < 200; i++) await setup?.mockMouse.scroll(30, row, "right");
+		await settle();
+		expect(frame()).toContain("TAILEND");
+	});
+});

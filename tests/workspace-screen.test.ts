@@ -145,7 +145,7 @@ describe("AC8 status line", () => {
 			"claude em",
 		);
 		expect(statusLine(s)).toMatch(
-			/^ Sanzio {2}SEGUINDO {2}⎇ feat\/sessions {2}claude em src\/a\.ts .* \+2 −1 · 1 arq {2}ctrl\+e editor · f seguir\s*$/,
+			/^ Sanzio {2}SEGUINDO {2}⎇ feat\/sessions {2}claude em src\/a\.ts .* \+2 −1 · 1 arq {2}ctrl\+e editor · ctrl\+o foco · f seguir\s*$/,
 		);
 	});
 });

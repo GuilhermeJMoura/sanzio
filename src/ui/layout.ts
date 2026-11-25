@@ -65,6 +65,15 @@ export function focusPane(s: WorkspaceState, pane: PaneId): WorkspaceState {
 	return { ...s, focus: pane };
 }
 
+const FOCUS_ORDER: PaneId[] = ["claude", "explorer", "editor"];
+
+/** ctrl+o: the next pane in claude → explorer → editor → claude; in conversation mode only claude is there. */
+export function cycleFocus(s: WorkspaceState): WorkspaceState {
+	if (!workspaceVisible(s)) return s;
+	const next = FOCUS_ORDER[(FOCUS_ORDER.indexOf(s.focus) + 1) % FOCUS_ORDER.length] ?? "claude";
+	return focusPane(s, next);
+}
+
 /** Edit mode started (or needs an answer): follow pauses and the editor shows the edited file with the focus. */
 export function startEditing(s: WorkspaceState, path: string): WorkspaceState {
 	return { ...open(s, path), follow: "paused", focus: "editor", manual: workspaceVisible(s) ? s.manual : true };

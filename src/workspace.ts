@@ -14,6 +14,7 @@ import { explorerItems } from "./ui/explorer.ts";
 import { ancestors, changedRows, treeRows } from "./ui/explorer-rows.ts";
 import {
 	claudeEdited,
+	cycleFocus,
 	dismissPending,
 	focusPane,
 	initialWorkspace,
@@ -197,7 +198,9 @@ export function createWorkspace(
 			}
 		} else if (pane === "editor") {
 			const step = { up: -1, down: 1, pageup: -10, pagedown: 10 }[key.name];
+			const columns = { left: -4, right: 4 }[key.name];
 			if (step) view.scrollEditor(step);
+			else if (columns) view.scrollEditorSideways(columns);
 			else if (key.name === "i" && plain && state.open) void editing.enter(state.open, view.editorTopLine());
 			else if (key.name === "v" && plain && state.open) set({ ...state, viewer: nextViewerMode(state.viewer) });
 		}
@@ -244,12 +247,12 @@ export function createWorkspace(
 
 	const timer = setInterval(render, TICK_MS);
 	renderer.on("resize", render);
-	// ctrl+e is sanzio's in every pane, claude's included (End still moves to the end of the line there);
-	// global key listeners run before the focused pane, so claude never sees it
+	// ctrl+e and ctrl+o are sanzio's in every pane, claude's included (End still moves to the end of the line there);
+	// global key listeners run before the focused pane, so claude never sees them
 	const onGlobalKey = (key: KeyEvent) => {
-		if (!key.ctrl || key.meta || key.name !== "e") return;
+		if (!key.ctrl || key.meta || (key.name !== "e" && key.name !== "o")) return;
 		key.preventDefault();
-		set(toggleWorkspace(state));
+		set(key.name === "e" ? toggleWorkspace(state) : cycleFocus(state));
 	};
 	renderer.keyInput.on("keypress", onGlobalKey);
 	render();

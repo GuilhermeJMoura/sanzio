@@ -206,6 +206,7 @@ export function createEditor(
 				});
 		},
 		scroll: viewer.scroll,
+		scrollSideways: viewer.scrollSideways,
 		topLine: viewer.topLine,
 	};
 }

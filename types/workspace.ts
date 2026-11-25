@@ -51,6 +51,7 @@ export type StatusOptional =
 	| "longWarning"
 	| "files"
 	| "editKeys"
+	| "focus"
 	| "follow"
 	| "editor"
 	| "counts"

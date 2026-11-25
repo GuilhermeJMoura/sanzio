@@ -1,4 +1,4 @@
-import type { CliRenderer, SimpleHighlight, SyntaxStyle } from "@opentui/core";
+import type { CliRenderer, Renderable, SimpleHighlight, SyntaxStyle } from "@opentui/core";
 import { BoxRenderable, CodeRenderable, LineNumberRenderable, pathToFiletype } from "@opentui/core";
 import type { ViewerMode } from "$types/edit.ts";
 import type { DiffOp, DiffRow } from "$types/observe.ts";
@@ -10,6 +10,12 @@ import { theme } from "./theme.ts";
 const d = theme;
 const JUST_TOP_MARGIN = 3;
 const DOUBLE_CLICK_MS = 400;
+const SHIFTED = { up: "left", down: "right", left: "up", right: "down" } as const;
+
+function isWithin(node: Renderable | null, ancestor: Renderable): boolean {
+	for (let at = node; at; at = at.parent) if (at === ancestor) return true;
+	return false;
+}
 
 function createCodePane(renderer: CliRenderer, id: string, style: SyntaxStyle, width: `${number}%`) {
 	let extra: SimpleHighlight[] = [];
@@ -63,6 +69,27 @@ export function createViewer(renderer: CliRenderer, style: SyntaxStyle, onEditAt
 	for (const pane of [single, left, right]) box.add(pane.gutter);
 	const panes = () => (single.gutter.visible ? [single] : [left, right]);
 
+	// one column for every visible pane, clamped to the longest line of any of them: OpenTUI clamps each half to its
+	// own lines, so the column is never read back from a pane
+	let column = 0;
+	const scrollSideways = (columns: number) => {
+		const all = panes();
+		const max = Math.max(...all.map((pane) => pane.code.maxScrollX));
+		column = Math.max(0, Math.min(max, Math.min(column, max) + columns));
+		for (const pane of all) pane.code.scrollX = column;
+	};
+
+	// OpenTUI scrolls the text under the wheel (shift turns it sideways) but the line numbers swallow it: a wheel there
+	// moves the text up or down here, and every sideways wheel drives the shared column
+	box.onMouseScroll = (event) => {
+		const pane = panes().find((p) => isWithin(event.target, p.gutter));
+		if (!pane || !event.scroll) return;
+		const { direction, delta } = event.scroll;
+		const turned = event.modifiers.shift ? SHIFTED[direction] : direction;
+		if (turned === "left" || turned === "right") scrollSideways(turned === "left" ? -delta : delta);
+		else if (event.target !== pane.code) pane.code.scrollY += turned === "up" ? -delta : delta;
+	};
+
 	let lastClick = { at: 0, y: -1 };
 	for (const pane of [single, left, right]) {
 		pane.code.onMouseDown = (event) => {
@@ -107,6 +134,10 @@ export function createViewer(renderer: CliRenderer, style: SyntaxStyle, onEditAt
 			} else if (reset) {
 				for (const pane of panes()) pane.code.scrollY = 0;
 			}
+			if (reset || (changed && newEdit)) {
+				column = 0;
+				for (const pane of panes()) pane.code.scrollX = 0;
+			}
 			if (changed || reset) shown = { path: model.path, mode: model.mode, justLines: model.justLines };
 		},
 		/** Shows plain diff rows (claude's change while I keep my text), not tied to the open file's state. */
@@ -122,6 +153,7 @@ export function createViewer(renderer: CliRenderer, style: SyntaxStyle, onEditAt
 				pane.code.scrollY = Math.max(0, Math.min(pane.code.maxScrollY, pane.code.scrollY + lines));
 			}
 		},
+		scrollSideways,
 		/** File line at the top of the view, where `i` puts the cursor. */
 		topLine(): number {
 			const pane = panes().at(-1);

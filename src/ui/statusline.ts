@@ -13,6 +13,7 @@ const DROPS: StatusOptional[] = [
 	"longWarning",
 	"files",
 	"editKeys",
+	"focus",
 	"follow",
 	"editor",
 	"counts",
@@ -58,6 +59,11 @@ function rightParts(m: StatusModel, show: Set<StatusOptional>): Segment[] {
 		tail.push([
 			{ text: "ctrl+e", fg: d.accent },
 			{ text: " editor", fg: d.faint },
+		]);
+	if (m.workspaceVisible && show.has("focus"))
+		tail.push([
+			{ text: "ctrl+o", fg: d.accent },
+			{ text: " foco", fg: d.faint },
 		]);
 	if (show.has("follow"))
 		tail.push([
