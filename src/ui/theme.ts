@@ -110,6 +110,7 @@ export function createSyntaxStyle(renderer: CliRenderer): SyntaxStyle {
 			operator: { fg: s.keyword },
 			string: { fg: s.string },
 			"string.special": { fg: s.string },
+			escape: { fg: s.number },
 			number: { fg: s.number },
 			boolean: { fg: s.number },
 			constant: { fg: s.number },
