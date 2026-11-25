@@ -198,7 +198,9 @@ export function createWorkspace(
 			}
 		} else if (pane === "editor") {
 			const step = { up: -1, down: 1, pageup: -10, pagedown: 10 }[key.name];
+			const columns = { left: -4, right: 4 }[key.name];
 			if (step) view.scrollEditor(step);
+			else if (columns) view.scrollEditorSideways(columns);
 			else if (key.name === "i" && plain && state.open) void editing.enter(state.open, view.editorTopLine());
 			else if (key.name === "v" && plain && state.open) set({ ...state, viewer: nextViewerMode(state.viewer) });
 		}

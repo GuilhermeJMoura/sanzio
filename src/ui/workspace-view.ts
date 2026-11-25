@@ -58,6 +58,7 @@ export function createWorkspaceView(
 	return {
 		root,
 		scrollEditor: editor.scroll,
+		scrollEditorSideways: editor.scrollSideways,
 		editorTopLine: editor.topLine,
 		editSurface: editor.surface,
 		render(vm: WorkspaceViewModel) {

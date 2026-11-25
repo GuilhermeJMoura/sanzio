@@ -74,3 +74,55 @@ describe("following an edit scrolls to the latest edit's first changed line", ()
 		expect(setup.captureCharFrame()).toMatch(/250 \+ const line250 = 'second try';\s+◂ claude/);
 	});
 });
+
+describe("AC5 the sideways scroll goes back to column 0 on another file, another mode or a new claude edit", () => {
+	const long = `HEAD ${"x".repeat(200)}`;
+	const before = ["const a = 1;", long, "const c = 3;"];
+	const after = ["const a = 2;", long, "const c = 3;"];
+
+	async function scrolled() {
+		setup = await createTestRenderer({ width: 80, height: 20 });
+		const editor = createEditor(setup.renderer, { onFocus: noop, onOpenPending: noop, onDismiss: noop, onTab: noop });
+		setup.renderer.root.add(editor.box);
+		const settle = async () => {
+			for (let i = 0; i < 6; i++) {
+				await setup?.renderOnce();
+				await Bun.sleep(20);
+			}
+		};
+		editor.update(model("src/a.ts", before, after, [1]));
+		await settle();
+		editor.scrollSideways(40);
+		await settle();
+		expect(setup.captureCharFrame()).not.toContain("HEAD");
+		return { editor, settle, frame: () => setup?.captureCharFrame() ?? "" };
+	}
+
+	test("another file", async () => {
+		const { editor, settle, frame } = await scrolled();
+		editor.update(model("src/b.ts", before, after, [1]));
+		await settle();
+		expect(frame()).toContain("HEAD");
+	});
+
+	test("another mode (v)", async () => {
+		const { editor, settle, frame } = await scrolled();
+		editor.update({ ...model("src/a.ts", before, after, [1]), viewer: "split" });
+		await settle();
+		expect(frame()).toContain("HEAD");
+	});
+
+	test("a new claude edit", async () => {
+		const { editor, settle, frame } = await scrolled();
+		editor.update(model("src/a.ts", before, ["const a = 3;", long, "const c = 3;"], [1]));
+		await settle();
+		expect(frame()).toContain("HEAD");
+	});
+
+	test("only the age or the gutter changing keeps the column", async () => {
+		const { editor, settle, frame } = await scrolled();
+		editor.update({ ...model("src/a.ts", before, after, []), justLines: [] });
+		await settle();
+		expect(frame()).not.toContain("HEAD");
+	});
+});
