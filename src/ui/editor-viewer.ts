@@ -5,9 +5,11 @@ import type { DiffOp, DiffRow } from "$types/observe.ts";
 import type { DiffView } from "$types/workspace.ts";
 import { contextRows } from "../observe/diff.ts";
 import { diffView, splitView } from "./diff-view.ts";
+import { registerParsers } from "./parsers.ts";
 import { theme } from "./theme.ts";
 
 const d = theme;
+registerParsers();
 const JUST_TOP_MARGIN = 3;
 const DOUBLE_CLICK_MS = 400;
 const SHIFTED = { up: "left", down: "right", left: "up", right: "down" } as const;

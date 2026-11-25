@@ -29,6 +29,7 @@
 	"files": [
 		"src",
 		"plugin",
+		"assets",
 		"README.md",
 		"LICENSE"
 	],

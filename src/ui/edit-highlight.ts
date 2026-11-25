@@ -1,5 +1,6 @@
 import type { SimpleHighlight, SyntaxStyle, TextareaRenderable, TextChunk, WidthMethod } from "@opentui/core";
 import { getTreeSitterClient, measureEditText, TextAttributes, treeSitterToTextChunks } from "@opentui/core";
+import { registerParsers } from "./parsers.ts";
 
 // one highlight pass at most this long after a change, however fast the typing: tree-sitter runs in its worker
 const DELAY_MS = 50;
@@ -7,6 +8,7 @@ const DELAY_MS = 50;
 const SLICE_MS = 6;
 const LINES_PER_STEP = 40;
 const ASCII = /^[\x20-\x7e]*$/;
+registerParsers();
 
 const flag = (attributes: number, bit: number) => (attributes & bit) !== 0;
 const yieldToKeys = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
