@@ -20,17 +20,11 @@ async function wheel(r: SanzioRun, button: number, text: string, times = 1): Pro
 	const row = lines.findIndex((line) => line.includes(text));
 	if (row < 0) throw new Error(`${text} not on screen:\n${lines.join("\n")}`);
 	const col = (lines[row] ?? "").indexOf(text);
-	for (let i = 0; i < times; i++) {
-		r.write(`\x1b[<${button};${col + 1};${row + 1}M`);
-		await Bun.sleep(10);
-	}
+	r.write(`\x1b[<${button};${col + 1};${row + 1}M`.repeat(times));
 }
 
-async function press(r: SanzioRun, key: string, times: number): Promise<void> {
-	for (let i = 0; i < times; i++) {
-		r.write(key);
-		await Bun.sleep(10);
-	}
+function press(r: SanzioRun, key: string, times: number): void {
+	r.write(key.repeat(times));
 }
 
 const atStart = (row: string) => row.includes(".........0") && !row.includes("TAILEND");
@@ -42,11 +36,11 @@ describe("AC1 → / ← scroll the focused viewer sideways, within the longest l
 		const r = run;
 		await r.click("alpha");
 		await Bun.sleep(100);
-		await press(r, KEY.right, 60); // 240 columns asked, 160 + TAILEND there
+		press(r, KEY.right, 60); // 240 columns asked, 160 + TAILEND there
 		await r.waitForScreen((s) => s.includes("TAILEND"), "the end of the long line");
 		await Bun.sleep(150);
 		expect(atEnd(await longRow(r))).toBe(true); // TAILEND against the border, no blank past it
-		await press(r, KEY.left, 80);
+		press(r, KEY.left, 80);
 		await r.waitForScreen((s) => s.includes("alpha"), "column 0");
 		expect(atStart(await longRow(r))).toBe(true);
 	});
@@ -56,16 +50,16 @@ describe("AC2 / AC3 the wheel scrolls the editor sideways (SGR mouse in a PTY)",
 	test("horizontal wheel (buttons 66/67) over the text moves the view right and back", async () => {
 		run = await openNotes(NOTES);
 		const r = run;
-		await wheel(r, 67, "row3", 120);
+		await wheel(r, 67, "row3", 90);
 		await r.waitForScreen((s) => s.includes("TAILEND"), "the end of the long line");
-		await wheel(r, 66, "TAILEND", 200);
+		await wheel(r, 66, "TAILEND", 90);
 		await r.waitForScreen((s) => s.includes("alpha") && s.includes(".........0"), "back at column 0");
 	});
 
 	test("shift + vertical wheel moves sideways, not up or down", async () => {
 		run = await openNotes(NOTES);
 		const r = run;
-		await wheel(r, 69, "row3", 120); // shift + wheel down
+		await wheel(r, 69, "row3", 90); // shift + wheel down
 		const screen = await r.waitForScreen((s) => s.includes("TAILEND"), "the end of the long line");
 		expect(screen).toMatch(/│\s+1\s/); // line 1 still at the top: no vertical scroll
 	});
@@ -76,7 +70,7 @@ describe("AC2 / AC3 the wheel scrolls the editor sideways (SGR mouse in a PTY)",
 		const lines = (await r.screen()).split("\n");
 		const row = lines.findIndex((line) => line.includes(".........0"));
 		const col = (lines[row] ?? "").search(/\s2\s/) + 1;
-		for (let i = 0; i < 120; i++) r.write(`\x1b[<67;${col + 1};${row + 1}M`);
+		r.write(`\x1b[<67;${col + 1};${row + 1}M`.repeat(90));
 		await r.waitForScreen((s) => s.includes("TAILEND"), "the end of the long line");
 	});
 });
@@ -99,7 +93,7 @@ describe("AC4 side by side: both halves scroll together, at the same column", ()
 		r.write("v");
 		await r.waitForScreen((s) => halves(s)[0] !== "", "side by side");
 
-		await press(r, KEY.right, 3);
+		press(r, KEY.right, 3);
 		let screen = await r.waitForScreen((s) => halves(s)[0].startsWith(".......1"), "both halves at column 12");
 		expect(halves(screen)[1].slice(0, 20)).toBe(halves(screen)[0].slice(0, 20));
 
@@ -124,7 +118,7 @@ describe("AC6 scrolled sideways, the gutter stays put", () => {
 		await r.waitForScreen((s) => /\s3 \+ gamma \./.test(s), "claude's edit, its ◂ claude past the right edge");
 		await r.click("alpha");
 		await Bun.sleep(100);
-		await press(r, KEY.right, 50);
+		press(r, KEY.right, 50);
 		const screen = await r.waitForScreen((s) => /END2\s+◂ claude/.test(s), "end of claude's line");
 		expect(screen).toMatch(/│\s+3 \+ .*END2\s+◂ claude│/);
 		expect(screen).toMatch(/│\s+2\s+\.*\d/);
