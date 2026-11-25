@@ -195,6 +195,7 @@ export function createEditor(
 			surface.gutter.visible = model.path !== null && edit.active && !showingClaudeDiff;
 			viewer.box.visible = model.path !== null && (!edit.active || showingClaudeDiff);
 			if (!model.path) return;
+			if (edit.active) surface.colorFor(model.path);
 			if (edit.conflict?.showingDiff) viewer.showRows(model.path, edit.conflict.rows);
 			else if (!edit.active)
 				viewer.update({
