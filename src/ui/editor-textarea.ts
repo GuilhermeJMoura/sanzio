@@ -1,6 +1,7 @@
 import type { CliRenderer, KeyEvent, SyntaxStyle } from "@opentui/core";
-import { defaultTextareaKeyBindings, LineNumberRenderable, TextareaRenderable } from "@opentui/core";
+import { defaultTextareaKeyBindings, LineNumberRenderable, pathToFiletype, TextareaRenderable } from "@opentui/core";
 import type { EditSnapshot } from "$types/edit.ts";
+import { createEditHighlighter } from "./edit-highlight.ts";
 import { theme } from "./theme.ts";
 
 const d = theme;
@@ -34,9 +35,11 @@ export function createEditSurface(
 		syntaxStyle: style,
 		keyBindings: KEY_BINDINGS,
 		onContentChange: () => {
+			highlighter.schedule();
 			if (!applying) handlers.onChange();
 		},
 	});
+	const highlighter = createEditHighlighter(area, style, renderer.widthMethod);
 	area.onKeyDown = handlers.onKey;
 	const gutter = new LineNumberRenderable(renderer, {
 		id: "editor-edit",
@@ -64,6 +67,10 @@ export function createEditSurface(
 			area.gotoLine(Math.max(0, line - 1));
 		},
 		set,
+		/** Colors the text as the viewer does for `path`'s language. */
+		colorFor(path: string) {
+			highlighter.setFiletype(pathToFiletype(path));
+		},
 		snapshot(): EditSnapshot {
 			return { text: area.plainText, cursor: area.cursorOffset };
 		},
