@@ -126,3 +126,40 @@ describe("AC5 the sideways scroll goes back to column 0 on another file, another
 		expect(frame()).not.toContain("HEAD");
 	});
 });
+
+describe("AC4 side by side with a longer new half: one shared column, up to the longer half's end", () => {
+	const before = ["const a = 1;", "short"];
+	const after = ["const a = 1;", `short ${"x".repeat(150)}TAILEND`];
+
+	async function split() {
+		setup = await createTestRenderer({ width: 80, height: 20 });
+		const editor = createEditor(setup.renderer, { onFocus: noop, onOpenPending: noop, onDismiss: noop, onTab: noop });
+		setup.renderer.root.add(editor.box);
+		editor.update({ ...model("src/a.ts", before, after, [2]), viewer: "split" });
+		const settle = async () => {
+			for (let i = 0; i < 6; i++) {
+				await setup?.renderOnce();
+				await Bun.sleep(20);
+			}
+		};
+		await settle();
+		return { editor, settle, frame: () => setup?.captureCharFrame() ?? "" };
+	}
+
+	test("→ reaches the end of the new half's long line", async () => {
+		const { editor, settle, frame } = await split();
+		for (let i = 0; i < 60; i++) editor.scrollSideways(4);
+		await settle();
+		expect(frame()).toContain("TAILEND");
+	});
+
+	test("the wheel over the narrower old half drives the shared column too", async () => {
+		const { settle, frame } = await split();
+		const row = frame()
+			.split("\n")
+			.findIndex((line) => line.includes("short"));
+		for (let i = 0; i < 200; i++) await setup?.mockMouse.scroll(30, row, "right");
+		await settle();
+		expect(frame()).toContain("TAILEND");
+	});
+});
