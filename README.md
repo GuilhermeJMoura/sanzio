@@ -93,6 +93,8 @@ The environment variable wins over the file.
 | `ctrl+z` / `ctrl+y` | editing          | undo / redo                                  |
 | `esc`               | editing          | stop editing (asks if there is unsaved text) |
 | `v`                 | editor           | diff, whole file, side by side               |
+| `←` / `→`           | editor           | scroll sideways through long lines           |
+| `shift` + wheel     | editor           | scroll sideways (or the trackpad sideways)   |
 
 ## From source
 
